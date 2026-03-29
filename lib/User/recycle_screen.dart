@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final supabase = Supabase.instance.client;
 
-// ─── Data Model ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Data Model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class RecycleRecord {
   final String id;
@@ -41,7 +41,7 @@ class RecycleRecord {
   }
 }
 
-// ─── Category Config ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Category Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class CategoryConfig {
   final String name;
@@ -99,7 +99,7 @@ const recyclingStations = [
   'EcoPoint Bachang',
 ];
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class RecycleScreen extends StatefulWidget {
   const RecycleScreen({super.key});
@@ -165,10 +165,13 @@ class _RecycleScreenState extends State<RecycleScreen>
     try {
       await supabase.from('recycle_records').delete().eq('id', id);
       await _loadRecords();
-      if (mounted) _showSnack('Record deleted', isError: false);
+      if (mounted) {
+        _showSnack('Record deleted', isError: false);
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         _showSnack('Delete failed. Please try again.', isError: true);
+      }
     }
   }
 
@@ -244,10 +247,11 @@ class _RecycleScreenState extends State<RecycleScreen>
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.2), width: 1),
+                            color: Colors.white.withValues(alpha: 0.2),
+                            width: 1),
                       ),
                       child: const Icon(Icons.arrow_back_ios_new_rounded,
                           color: Colors.white, size: 16),
@@ -258,7 +262,7 @@ class _RecycleScreenState extends State<RecycleScreen>
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.eco_rounded,
@@ -274,9 +278,10 @@ class _RecycleScreenState extends State<RecycleScreen>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2)),
                     ),
                     child: Row(children: [
                       const Icon(Icons.star_rounded,
@@ -315,7 +320,7 @@ class _RecycleScreenState extends State<RecycleScreen>
         indicatorColor: const Color(0xFF7EEDB0),
         indicatorWeight: 2.5,
         labelColor: const Color(0xFF7EEDB0),
-        unselectedLabelColor: Colors.white.withOpacity(0.5),
+        unselectedLabelColor: Colors.white.withValues(alpha: 0.5),
         labelStyle:
             GoogleFonts.dmSans(fontSize: 13, fontWeight: FontWeight.w600),
         unselectedLabelStyle: GoogleFonts.dmSans(fontSize: 13),
@@ -327,7 +332,7 @@ class _RecycleScreenState extends State<RecycleScreen>
     );
   }
 
-  // ── Tab 1: Add Record (inline form) ─────────────────────────────────────────
+  // â”€â”€ Tab 1: Add Record (inline form) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildAddTab() {
     return SingleChildScrollView(
@@ -336,7 +341,7 @@ class _RecycleScreenState extends State<RecycleScreen>
     );
   }
 
-  // ── Tab 2: History ──────────────────────────────────────────────────────────
+  // â”€â”€ Tab 2: History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildHistoryTab() {
     if (_records.isEmpty) {
@@ -394,7 +399,7 @@ class _RecycleScreenState extends State<RecycleScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 4))
         ],
@@ -494,7 +499,7 @@ class _RecycleScreenState extends State<RecycleScreen>
   }
 }
 
-// ─── Inline Add Form (Tab 1) ───────────────────────────────────────────────────
+// â”€â”€â”€ Inline Add Form (Tab 1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _InlineAddForm extends StatefulWidget {
   final Future<void> Function() onSuccess;
@@ -544,14 +549,17 @@ class _InlineAddFormState extends State<_InlineAddForm> {
       _weightController.clear();
       setState(() => _selectedCategory = 'Plastic');
       await widget.onSuccess();
-      if (mounted)
-        _showSnack('Record submitted! You earned $pts points 🎉',
-            isError: false);
+      if (mounted) {
+        _showSnack('Record submitted! You earned $pts points!', isError: false);
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         _showSnack('Submission failed. Please try again.', isError: true);
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -575,7 +583,7 @@ class _InlineAddFormState extends State<_InlineAddForm> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 16,
               offset: const Offset(0, 4))
         ],
@@ -822,7 +830,7 @@ class _InlineAddFormState extends State<_InlineAddForm> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2D7A4F),
                 disabledBackgroundColor:
-                    const Color(0xFF2D7A4F).withOpacity(0.5),
+                    const Color(0xFF2D7A4F).withValues(alpha: 0.5),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
                 elevation: 0,
@@ -846,7 +854,7 @@ class _InlineAddFormState extends State<_InlineAddForm> {
   }
 }
 
-// ─── Record Card ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Record Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _RecordCard extends StatelessWidget {
   final RecycleRecord record;
@@ -873,7 +881,7 @@ class _RecordCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 3))
         ],
@@ -897,7 +905,7 @@ class _RecordCard extends StatelessWidget {
                       fontSize: 14,
                       fontWeight: FontWeight.w600)),
               const SizedBox(height: 2),
-              Text('$dateStr  ·  ${record.station}',
+              Text('$dateStr  Â·  ${record.station}',
                   style: GoogleFonts.dmSans(
                       color: Colors.grey.shade500, fontSize: 11),
                   overflow: TextOverflow.ellipsis),
@@ -951,7 +959,7 @@ class _RecordCard extends StatelessWidget {
   }
 }
 
-// ─── Edit Sheet ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Edit Sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _AddRecordSheet extends StatefulWidget {
   final RecycleRecord? editing;

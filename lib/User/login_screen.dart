@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
-import '../widgets/custom_text_field.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -62,12 +61,17 @@ class _LoginScreenState extends State<LoginScreen>
         password: _passwordController.text.trim(),
       );
     } on AuthException catch (e) {
-      if (mounted) _showError(e.message);
+      if (mounted) {
+        _showError(e.message);
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         _showError('An unexpected error occurred. Please try again.');
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -134,7 +138,8 @@ class _LoginScreenState extends State<LoginScreen>
                           borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF2DB86A).withOpacity(0.5),
+                              color: const Color(0xFF2DB86A)
+                                  .withValues(alpha: 0.5),
                               blurRadius: 24,
                               offset: const Offset(0, 10),
                             ),
@@ -164,7 +169,7 @@ class _LoginScreenState extends State<LoginScreen>
                       Text(
                         'Smart Recycling & Carbon Tracker',
                         style: GoogleFonts.dmSans(
-                          color: Colors.white.withOpacity(0.65),
+                          color: Colors.white.withValues(alpha: 0.65),
                           fontSize: 13,
                         ),
                       ),
@@ -175,10 +180,10 @@ class _LoginScreenState extends State<LoginScreen>
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.10),
+                          color: Colors.white.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.15),
+                            color: Colors.white.withValues(alpha: 0.15),
                             width: 1.5,
                           ),
                         ),
@@ -193,10 +198,12 @@ class _LoginScreenState extends State<LoginScreen>
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
                               validator: (val) {
-                                if (val == null || val.isEmpty)
+                                if (val == null || val.isEmpty) {
                                   return 'Please enter your email';
-                                if (!val.contains('@'))
+                                }
+                                if (!val.contains('@')) {
                                   return 'Please enter a valid email address';
+                                }
                                 return null;
                               },
                             ),
@@ -211,10 +218,12 @@ class _LoginScreenState extends State<LoginScreen>
                               controller: _passwordController,
                               isPassword: true,
                               validator: (val) {
-                                if (val == null || val.isEmpty)
+                                if (val == null || val.isEmpty) {
                                   return 'Please enter a password';
-                                if (val.length < 6)
+                                }
+                                if (val.length < 6) {
                                   return 'Password must be at least 6 characters';
+                                }
                                 return null;
                               },
                             ),
@@ -230,7 +239,8 @@ class _LoginScreenState extends State<LoginScreen>
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF4CD787),
                                   disabledBackgroundColor:
-                                      const Color(0xFF4CD787).withOpacity(0.5),
+                                      const Color(0xFF4CD787)
+                                          .withValues(alpha: 0.5),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
@@ -264,7 +274,8 @@ class _LoginScreenState extends State<LoginScreen>
                               children: [
                                 Expanded(
                                   child: Divider(
-                                      color: Colors.white.withOpacity(0.25)),
+                                      color:
+                                          Colors.white.withValues(alpha: 0.25)),
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.symmetric(
@@ -272,14 +283,16 @@ class _LoginScreenState extends State<LoginScreen>
                                   child: Text(
                                     'or',
                                     style: GoogleFonts.dmSans(
-                                      color: Colors.white.withOpacity(0.5),
+                                      color:
+                                          Colors.white.withValues(alpha: 0.5),
                                       fontSize: 13,
                                     ),
                                   ),
                                 ),
                                 Expanded(
                                   child: Divider(
-                                      color: Colors.white.withOpacity(0.25)),
+                                      color:
+                                          Colors.white.withValues(alpha: 0.25)),
                                 ),
                               ],
                             ),
@@ -296,11 +309,11 @@ class _LoginScreenState extends State<LoginScreen>
                                 },
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(
-                                    color: Colors.white.withOpacity(0.3),
+                                    color: Colors.white.withValues(alpha: 0.3),
                                     width: 1.5,
                                   ),
                                   backgroundColor:
-                                      Colors.white.withOpacity(0.08),
+                                      Colors.white.withValues(alpha: 0.08),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
@@ -357,7 +370,7 @@ class _LoginScreenState extends State<LoginScreen>
                         child: RichText(
                           text: TextSpan(
                             style: GoogleFonts.dmSans(
-                              color: Colors.white.withOpacity(0.6),
+                              color: Colors.white.withValues(alpha: 0.6),
                               fontSize: 14,
                             ),
                             children: [
@@ -387,7 +400,7 @@ class _LoginScreenState extends State<LoginScreen>
   }
 }
 
-// ─── Green-themed text field ────────────────────────────────────────────────
+// â”€â”€â”€ Green-themed text field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _GreenTextField extends StatefulWidget {
   final String label;
@@ -423,7 +436,7 @@ class _GreenTextFieldState extends State<_GreenTextField> {
         Text(
           widget.label,
           style: GoogleFonts.dmSans(
-            color: Colors.white.withOpacity(0.75),
+            color: Colors.white.withValues(alpha: 0.75),
             fontSize: 12,
             fontWeight: FontWeight.w600,
             letterSpacing: 0.8,
@@ -439,25 +452,25 @@ class _GreenTextFieldState extends State<_GreenTextField> {
           decoration: InputDecoration(
             hintText: widget.hint,
             hintStyle: GoogleFonts.dmSans(
-              color: Colors.white.withOpacity(0.35),
+              color: Colors.white.withValues(alpha: 0.35),
               fontSize: 15,
             ),
             prefixIcon: Icon(widget.icon,
-                color: Colors.white.withOpacity(0.6), size: 20),
+                color: Colors.white.withValues(alpha: 0.6), size: 20),
             suffixIcon: widget.isPassword
                 ? IconButton(
                     icon: Icon(
                       _obscure
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       size: 20,
                     ),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   )
                 : null,
             filled: true,
-            fillColor: Colors.white.withOpacity(0.10),
+            fillColor: Colors.white.withValues(alpha: 0.10),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide.none,
@@ -465,7 +478,7 @@ class _GreenTextFieldState extends State<_GreenTextField> {
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
               borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.15),
+                color: Colors.white.withValues(alpha: 0.15),
                 width: 1.5,
               ),
             ),

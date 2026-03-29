@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -31,11 +31,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (user == null) return;
 
       // Load profile
-      final profile = await _supabase
-          .from('profiles')
-          .select()
-          .eq('id', user.id)
-          .single();
+      final profile =
+          await _supabase.from('profiles').select().eq('id', user.id).single();
 
       // Load recycle stats
       final records = await _supabase
@@ -67,11 +64,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // Compute eco level from points
   Map<String, dynamic> _ecoLevel() {
-    if (_totalPoints >= 500) return {'label': 'Eco Master', 'level': 20, 'emoji': '🌍'};
-    if (_totalPoints >= 300) return {'label': 'Eco Champion', 'level': 15, 'emoji': '🌳'};
-    if (_totalPoints >= 150) return {'label': 'Eco Warrior', 'level': 12, 'emoji': '🌿'};
-    if (_totalPoints >= 50)  return {'label': 'Eco Starter', 'level': 5,  'emoji': '🌱'};
-    return {'label': 'Newcomer', 'level': 1, 'emoji': '🌾'};
+    if (_totalPoints >= 500) {
+      return {'label': 'Eco Master', 'level': 20, 'emoji': 'EM'};
+    }
+    if (_totalPoints >= 300) {
+      return {'label': 'Eco Champion', 'level': 15, 'emoji': 'EC'};
+    }
+    if (_totalPoints >= 150) {
+      return {'label': 'Eco Warrior', 'level': 12, 'emoji': 'EW'};
+    }
+    if (_totalPoints >= 50) {
+      return {'label': 'Eco Starter', 'level': 5, 'emoji': 'ES'};
+    }
+    return {'label': 'Newcomer', 'level': 1, 'emoji': 'NC'};
   }
 
   Future<void> _signOut() async {
@@ -110,8 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showEditUsernameSheet() async {
-    final controller =
-    TextEditingController(text: _profile?['username'] ?? '');
+    final controller = TextEditingController(text: _profile?['username'] ?? '');
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -135,267 +139,273 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: const Color(0xFFF0F6F2),
       body: _isLoading
           ? const Center(
-          child: CircularProgressIndicator(color: Color(0xFF2D7A4F)))
+              child: CircularProgressIndicator(color: Color(0xFF2D7A4F)))
           : CustomScrollView(
-        slivers: [
-          // ── Header ──────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF1A4731), Color(0xFF2D7A4F)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-                  child: Column(
-                    children: [
-                      // Top bar
-                      Row(children: [
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: Container(
-                            width: 38, height: 38,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color:
-                                  Colors.white.withOpacity(0.2)),
-                            ),
-                            child: const Icon(
-                                Icons.arrow_back_ios_new_rounded,
-                                color: Colors.white,
-                                size: 16),
-                          ),
-                        ),
-                        const Spacer(),
-                        Text('Profile',
-                            style: GoogleFonts.dmSans(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600)),
-                        const Spacer(),
-                        // Edit button
-                        GestureDetector(
-                          onTap: _showEditUsernameSheet,
-                          child: Container(
-                            width: 38, height: 38,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color:
-                                  Colors.white.withOpacity(0.2)),
-                            ),
-                            child: const Icon(Icons.edit_outlined,
-                                color: Colors.white, size: 17),
-                          ),
-                        ),
-                      ]),
-                      const SizedBox(height: 24),
-                      // Avatar
-                      Container(
-                        width: 72, height: 72,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF7EEDB0),
-                          borderRadius: BorderRadius.circular(22),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
-                                blurRadius: 16,
-                                offset: const Offset(0, 6)),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            username.isNotEmpty
-                                ? username[0].toUpperCase()
-                                : 'U',
-                            style: GoogleFonts.dmSerifDisplay(
-                                color: const Color(0xFF1A4731),
-                                fontSize: 30),
-                          ),
-                        ),
+              slivers: [
+                // â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                SliverToBoxAdapter(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF1A4731), Color(0xFF2D7A4F)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      const SizedBox(height: 12),
-                      Text(username,
-                          style: GoogleFonts.dmSerifDisplay(
-                              color: Colors.white, fontSize: 22)),
-                      const SizedBox(height: 4),
-                      Text(email,
-                          style: GoogleFonts.dmSans(
-                              color: Colors.white60, fontSize: 13)),
-                      const SizedBox(height: 12),
-                      // Eco badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2D7A4F),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: const Color(0xFF7EEDB0)
-                                  .withOpacity(0.4),
-                              width: 1.5),
-                        ),
-                        child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(level['emoji'],
-                                  style:
-                                  const TextStyle(fontSize: 14)),
-                              const SizedBox(width: 6),
-                              Text(
-                                '${level['label']} · Lv. ${level['level']}',
-                                style: GoogleFonts.dmSans(
-                                    color: const Color(0xFF7EEDB0),
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600),
+                    ),
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                        child: Column(
+                          children: [
+                            // Top bar
+                            Row(children: [
+                              GestureDetector(
+                                onTap: () => Navigator.pop(context),
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.2)),
+                                  ),
+                                  child: const Icon(
+                                      Icons.arrow_back_ios_new_rounded,
+                                      color: Colors.white,
+                                      size: 16),
+                                ),
+                              ),
+                              const Spacer(),
+                              Text('Profile',
+                                  style: GoogleFonts.dmSans(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600)),
+                              const Spacer(),
+                              // Edit button
+                              GestureDetector(
+                                onTap: _showEditUsernameSheet,
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                        color: Colors.white
+                                            .withValues(alpha: 0.2)),
+                                  ),
+                                  child: const Icon(Icons.edit_outlined,
+                                      color: Colors.white, size: 17),
+                                ),
                               ),
                             ]),
+                            const SizedBox(height: 24),
+                            // Avatar
+                            Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF7EEDB0),
+                                borderRadius: BorderRadius.circular(22),
+                                boxShadow: [
+                                  BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.15),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 6)),
+                                ],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  username.isNotEmpty
+                                      ? username[0].toUpperCase()
+                                      : 'U',
+                                  style: GoogleFonts.dmSerifDisplay(
+                                      color: const Color(0xFF1A4731),
+                                      fontSize: 30),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(username,
+                                style: GoogleFonts.dmSerifDisplay(
+                                    color: Colors.white, fontSize: 22)),
+                            const SizedBox(height: 4),
+                            Text(email,
+                                style: GoogleFonts.dmSans(
+                                    color: Colors.white60, fontSize: 13)),
+                            const SizedBox(height: 12),
+                            // Eco badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2D7A4F),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color: const Color(0xFF7EEDB0)
+                                        .withValues(alpha: 0.4),
+                                    width: 1.5),
+                              ),
+                              child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.eco_rounded,
+                                        color: Color(0xFF7EEDB0), size: 15),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '${level['label']} Â· Lv. ${level['level']}',
+                                      style: GoogleFonts.dmSans(
+                                          color: const Color(0xFF7EEDB0),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                  ]),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(18, 20, 18, 40),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // ── Stats Card ─────────────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4))
-                    ],
-                  ),
-                  child: Row(children: [
-                    _statItem(
-                        '${_totalWeight.toStringAsFixed(1)} kg',
-                        'Recycled'),
-                    _divider(),
-                    _statItem(
-                        '${_co2Saved.toStringAsFixed(1)}',
-                        'CO₂ Saved'),
-                    _divider(),
-                    _statItem('$_totalPoints', 'Points'),
-                  ]),
-                ),
-
-                const SizedBox(height: 28),
-
-                // ── Account Section ────────────────────────────────────
-                _sectionLabel('Account'),
-                const SizedBox(height: 10),
-                _menuGroup([
-                  _MenuItem(
-                    emoji: '✏️',
-                    emojiColor: const Color(0xFFFFF3E3),
-                    title: 'Edit Profile',
-                    onTap: _showEditUsernameSheet,
-                  ),
-                  _MenuItem(
-                    emoji: '🔔',
-                    emojiColor: const Color(0xFFE8F0FA),
-                    title: 'Notifications',
-                    onTap: () => _showComingSoon('Notifications'),
-                  ),
-                  _MenuItem(
-                    emoji: '🔒',
-                    emojiColor: const Color(0xFFFBF3E3),
-                    title: 'Privacy & Security',
-                    onTap: () => _showComingSoon('Privacy & Security'),
-                    isLast: true,
-                  ),
-                ]),
-
-                const SizedBox(height: 24),
-
-                // ── Achievements Section ───────────────────────────────
-                _sectionLabel('Achievements'),
-                const SizedBox(height: 10),
-                _menuGroup([
-                  _MenuItem(
-                    emoji: '📋',
-                    emojiColor: const Color(0xFFE8F5EE),
-                    title: 'Impact History',
-                    subtitle: 'Joined $joined',
-                    onTap: () => _showComingSoon('Impact History'),
-                    isLast: true,
-                  ),
-                ]),
-
-                const SizedBox(height: 24),
-
-                // ── App Section ────────────────────────────────────────
-                _sectionLabel('App'),
-                const SizedBox(height: 10),
-                _menuGroup([
-                  _MenuItem(
-                    emoji: '⭐',
-                    emojiColor: const Color(0xFFFFF8E1),
-                    title: 'Rate the App',
-                    onTap: () => _showComingSoon('Rate the App'),
-                  ),
-                  _MenuItem(
-                    emoji: 'ℹ️',
-                    emojiColor: const Color(0xFFE8F0FA),
-                    title: 'About GreenTrack',
-                    subtitle: 'Version 1.0.0',
-                    onTap: () => _showComingSoon('About'),
-                    isLast: true,
-                  ),
-                ]),
-
-                const SizedBox(height: 28),
-
-                // ── Logout Button ──────────────────────────────────────
-                GestureDetector(
-                  onTap: _signOut,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF0F0),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                          color: const Color(0xFFFFD0D0), width: 1.5),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.logout_rounded,
-                            color: Color(0xFFE05454), size: 18),
-                        const SizedBox(width: 8),
-                        Text('Logout',
-                            style: GoogleFonts.dmSans(
-                                color: const Color(0xFFE05454),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600)),
-                      ],
                     ),
                   ),
                 ),
-              ]),
+
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(18, 20, 18, 40),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // â”€â”€ Stats Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4))
+                          ],
+                        ),
+                        child: Row(children: [
+                          _statItem('${_totalWeight.toStringAsFixed(1)} kg',
+                              'Recycled'),
+                          _divider(),
+                          _statItem(_co2Saved.toStringAsFixed(1), 'CO2 Saved'),
+                          _divider(),
+                          _statItem(_totalPoints.toString(), 'Points'),
+                        ]),
+                      ),
+
+                      const SizedBox(height: 28),
+
+                      // â”€â”€ Account Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                      _sectionLabel('Account'),
+                      const SizedBox(height: 10),
+                      _menuGroup([
+                        _MenuItem(
+                          icon: Icons.edit_outlined,
+                          iconColor: const Color(0xFFCC8A2E),
+                          emojiColor: const Color(0xFFFFF3E3),
+                          title: 'Edit Profile',
+                          onTap: _showEditUsernameSheet,
+                        ),
+                        _MenuItem(
+                          icon: Icons.notifications_none_rounded,
+                          iconColor: const Color(0xFF4A90D9),
+                          emojiColor: const Color(0xFFE8F0FA),
+                          title: 'Notifications',
+                          onTap: () => _showComingSoon('Notifications'),
+                        ),
+                        _MenuItem(
+                          icon: Icons.shield_outlined,
+                          iconColor: const Color(0xFFE8A020),
+                          emojiColor: const Color(0xFFFBF3E3),
+                          title: 'Privacy & Security',
+                          onTap: () => _showComingSoon('Privacy & Security'),
+                          isLast: true,
+                        ),
+                      ]),
+
+                      const SizedBox(height: 24),
+
+                      // â”€â”€ Achievements Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                      _sectionLabel('Achievements'),
+                      const SizedBox(height: 10),
+                      _menuGroup([
+                        _MenuItem(
+                          icon: Icons.history_rounded,
+                          iconColor: const Color(0xFF3DAB6A),
+                          emojiColor: const Color(0xFFE8F5EE),
+                          title: 'Impact History',
+                          subtitle: 'Joined $joined',
+                          onTap: () => _showComingSoon('Impact History'),
+                          isLast: true,
+                        ),
+                      ]),
+
+                      const SizedBox(height: 24),
+
+                      // â”€â”€ App Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                      _sectionLabel('App'),
+                      const SizedBox(height: 10),
+                      _menuGroup([
+                        _MenuItem(
+                          icon: Icons.star_border_rounded,
+                          iconColor: const Color(0xFFE8A020),
+                          emojiColor: const Color(0xFFFFF8E1),
+                          title: 'Rate the App',
+                          onTap: () => _showComingSoon('Rate the App'),
+                        ),
+                        _MenuItem(
+                          icon: Icons.info_outline_rounded,
+                          iconColor: const Color(0xFF4A90D9),
+                          emojiColor: const Color(0xFFE8F0FA),
+                          title: 'About GreenTrack',
+                          subtitle: 'Version 1.0.0',
+                          onTap: () => _showComingSoon('About'),
+                          isLast: true,
+                        ),
+                      ]),
+
+                      const SizedBox(height: 28),
+
+                      // â”€â”€ Logout Button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                      GestureDetector(
+                        onTap: _signOut,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF0F0),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                                color: const Color(0xFFFFD0D0), width: 1.5),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.logout_rounded,
+                                  color: Color(0xFFE05454), size: 18),
+                              const SizedBox(width: 8),
+                              Text('Logout',
+                                  style: GoogleFonts.dmSans(
+                                      color: const Color(0xFFE05454),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -409,15 +419,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 fontWeight: FontWeight.w800)),
         const SizedBox(height: 2),
         Text(label,
-            style: GoogleFonts.dmSans(
-                color: Colors.grey.shade400, fontSize: 12)),
+            style:
+                GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 12)),
       ]),
     );
   }
 
   Widget _divider() {
-    return Container(
-        width: 1, height: 36, color: Colors.grey.shade100);
+    return Container(width: 1, height: 36, color: Colors.grey.shade100);
   }
 
   Widget _sectionLabel(String title) {
@@ -435,7 +444,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 3))
         ],
@@ -446,7 +455,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showComingSoon(String feature) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('$feature — coming soon!',
+      content: Text('$feature â€” coming soon!',
           style: GoogleFonts.dmSans(color: Colors.white)),
       backgroundColor: const Color(0xFF2D7A4F),
       behavior: SnackBarBehavior.floating,
@@ -456,10 +465,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// ─── Menu Item ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Menu Item â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _MenuItem extends StatelessWidget {
-  final String emoji;
+  final IconData icon;
+  final Color iconColor;
   final Color emojiColor;
   final String title;
   final String? subtitle;
@@ -467,7 +477,8 @@ class _MenuItem extends StatelessWidget {
   final bool isLast;
 
   const _MenuItem({
-    required this.emoji,
+    required this.icon,
+    required this.iconColor,
     required this.emojiColor,
     required this.title,
     required this.onTap,
@@ -483,17 +494,14 @@ class _MenuItem extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(18),
           child: Padding(
-            padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(children: [
               Container(
-                width: 40, height: 40,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                    color: emojiColor,
-                    borderRadius: BorderRadius.circular(12)),
-                child: Center(
-                    child: Text(emoji,
-                        style: const TextStyle(fontSize: 18))),
+                    color: emojiColor, borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: iconColor, size: 20),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -509,8 +517,7 @@ class _MenuItem extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(subtitle!,
                           style: GoogleFonts.dmSans(
-                              color: Colors.grey.shade400,
-                              fontSize: 12)),
+                              color: Colors.grey.shade400, fontSize: 12)),
                     ],
                   ],
                 ),
@@ -531,7 +538,7 @@ class _MenuItem extends StatelessWidget {
   }
 }
 
-// ─── Edit Username Sheet ──────────────────────────────────────────────────────
+// â”€â”€â”€ Edit Username Sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _EditUsernameSheet extends StatefulWidget {
   final TextEditingController controller;
@@ -565,8 +572,8 @@ class _EditUsernameSheetState extends State<_EditUsernameSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         decoration: const BoxDecoration(
@@ -579,7 +586,8 @@ class _EditUsernameSheetState extends State<_EditUsernameSheet> {
           children: [
             Center(
               child: Container(
-                width: 36, height: 4,
+                width: 36,
+                height: 4,
                 decoration: BoxDecoration(
                     color: Colors.grey.shade200,
                     borderRadius: BorderRadius.circular(2)),
@@ -599,8 +607,7 @@ class _EditUsernameSheetState extends State<_EditUsernameSheet> {
                   color: const Color(0xFF1A4731), fontSize: 15),
               decoration: InputDecoration(
                 hintText: 'Enter your username',
-                hintStyle:
-                GoogleFonts.dmSans(color: Colors.grey.shade300),
+                hintStyle: GoogleFonts.dmSans(color: Colors.grey.shade300),
                 filled: true,
                 fillColor: const Color(0xFFF7F9F8),
                 border: OutlineInputBorder(
@@ -608,13 +615,13 @@ class _EditUsernameSheetState extends State<_EditUsernameSheet> {
                     borderSide: BorderSide.none),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                      color: Color(0xFF3DAB6A), width: 1.5),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF3DAB6A), width: 1.5),
                 ),
                 prefixIcon: const Icon(Icons.person_outline_rounded,
                     color: Color(0xFF3DAB6A), size: 20),
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 14),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               ),
             ),
             const SizedBox(height: 16),
@@ -626,21 +633,22 @@ class _EditUsernameSheetState extends State<_EditUsernameSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2D7A4F),
                   disabledBackgroundColor:
-                  const Color(0xFF2D7A4F).withOpacity(0.5),
+                      const Color(0xFF2D7A4F).withValues(alpha: 0.5),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
                 ),
                 child: _isSaving
                     ? const SizedBox(
-                    width: 20, height: 20,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2.5))
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2.5))
                     : Text('Save Changes',
-                    style: GoogleFonts.dmSans(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15)),
+                        style: GoogleFonts.dmSans(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15)),
               ),
             ),
           ],
