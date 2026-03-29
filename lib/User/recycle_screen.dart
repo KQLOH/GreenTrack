@@ -115,11 +115,8 @@ class _RecycleScreenState extends State<RecycleScreen>
   bool _isLoading = true;
 
   // Stats
-  double get _totalWeight =>
-      _records.fold(0, (sum, r) => sum + r.weightKg);
-  int get _totalPoints =>
-      _records.fold(0, (sum, r) => sum + r.points);
-
+  double get _totalWeight => _records.fold(0, (sum, r) => sum + r.weightKg);
+  int get _totalPoints => _records.fold(0, (sum, r) => sum + r.points);
 
   Map<String, double> get _categoryWeights {
     final map = <String, double>{};
@@ -154,7 +151,8 @@ class _RecycleScreenState extends State<RecycleScreen>
           .order('date', ascending: false);
       if (mounted) {
         setState(() {
-          _records = (data as List).map((e) => RecycleRecord.fromMap(e)).toList();
+          _records =
+              (data as List).map((e) => RecycleRecord.fromMap(e)).toList();
           _isLoading = false;
         });
       }
@@ -167,16 +165,18 @@ class _RecycleScreenState extends State<RecycleScreen>
     try {
       await supabase.from('recycle_records').delete().eq('id', id);
       await _loadRecords();
-      if (mounted) _showSnack('记录已删除', isError: false);
+      if (mounted) _showSnack('Record deleted', isError: false);
     } catch (e) {
-      if (mounted) _showSnack('删除失败，请重试', isError: true);
+      if (mounted)
+        _showSnack('Delete failed. Please try again.', isError: true);
     }
   }
 
   void _showSnack(String msg, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg, style: GoogleFonts.dmSans(color: Colors.white)),
-      backgroundColor: isError ? const Color(0xFFE05454) : const Color(0xFF3DAB6A),
+      backgroundColor:
+          isError ? const Color(0xFFE05454) : const Color(0xFF3DAB6A),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: const EdgeInsets.all(16),
@@ -204,15 +204,14 @@ class _RecycleScreenState extends State<RecycleScreen>
           Expanded(
             child: _isLoading
                 ? const Center(
-                child: CircularProgressIndicator(
-                    color: Color(0xFF3DAB6A)))
+                    child: CircularProgressIndicator(color: Color(0xFF3DAB6A)))
                 : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildAddTab(),
-                _buildHistoryTab(),
-              ],
-            ),
+                    controller: _tabController,
+                    children: [
+                      _buildAddTab(),
+                      _buildHistoryTab(),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -242,7 +241,8 @@ class _RecycleScreenState extends State<RecycleScreen>
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
-                      width: 38, height: 38,
+                      width: 38,
+                      height: 38,
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(12),
@@ -255,7 +255,8 @@ class _RecycleScreenState extends State<RecycleScreen>
                   ),
                   const SizedBox(width: 12),
                   Container(
-                    width: 32, height: 32,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(10),
@@ -270,13 +271,12 @@ class _RecycleScreenState extends State<RecycleScreen>
                   const Spacer(),
                   // Points badge
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 7),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                          color: Colors.white.withOpacity(0.2)),
+                      border: Border.all(color: Colors.white.withOpacity(0.2)),
                     ),
                     child: Row(children: [
                       const Icon(Icons.star_rounded,
@@ -298,16 +298,14 @@ class _RecycleScreenState extends State<RecycleScreen>
                       color: Colors.white, fontSize: 26)),
               const SizedBox(height: 2),
               Text('Track your recycling records',
-                  style: GoogleFonts.dmSans(
-                      color: Colors.white60, fontSize: 12)),
-
+                  style:
+                      GoogleFonts.dmSans(color: Colors.white60, fontSize: 12)),
             ],
           ),
         ),
       ),
     );
   }
-
 
   Widget _buildTabBar() {
     return Container(
@@ -318,7 +316,8 @@ class _RecycleScreenState extends State<RecycleScreen>
         indicatorWeight: 2.5,
         labelColor: const Color(0xFF7EEDB0),
         unselectedLabelColor: Colors.white.withOpacity(0.5),
-        labelStyle: GoogleFonts.dmSans(fontSize: 13, fontWeight: FontWeight.w600),
+        labelStyle:
+            GoogleFonts.dmSans(fontSize: 13, fontWeight: FontWeight.w600),
         unselectedLabelStyle: GoogleFonts.dmSans(fontSize: 13),
         tabs: const [
           Tab(text: 'ADD / SUBMIT'),
@@ -348,11 +347,11 @@ class _RecycleScreenState extends State<RecycleScreen>
             Icon(Icons.recycling_rounded,
                 size: 60, color: Colors.grey.shade300),
             const SizedBox(height: 16),
-            Text('还没有记录',
+            Text('No records yet',
                 style: GoogleFonts.dmSans(
                     color: Colors.grey.shade400, fontSize: 16)),
             const SizedBox(height: 8),
-            Text('去 ADD 页面添加你的第一条记录！',
+            Text('Go to the ADD page to submit your first record!',
                 style: GoogleFonts.dmSans(
                     color: Colors.grey.shade400, fontSize: 13)),
           ],
@@ -378,10 +377,10 @@ class _RecycleScreenState extends State<RecycleScreen>
                   fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           ..._records.map((r) => _RecordCard(
-            record: r,
-            onEdit: () => _openAddSheet(editing: r),
-            onDelete: () => _showDeleteDialog(r.id),
-          )),
+                record: r,
+                onEdit: () => _openAddSheet(editing: r),
+                onDelete: () => _showDeleteDialog(r.id),
+              )),
         ],
       ),
     );
@@ -396,7 +395,8 @@ class _RecycleScreenState extends State<RecycleScreen>
         boxShadow: [
           BoxShadow(
               color: Colors.black.withOpacity(0.04),
-              blurRadius: 12, offset: const Offset(0, 4))
+              blurRadius: 12,
+              offset: const Offset(0, 4))
         ],
       ),
       child: Column(
@@ -417,7 +417,8 @@ class _RecycleScreenState extends State<RecycleScreen>
                 children: [
                   Row(children: [
                     Container(
-                      width: 28, height: 28,
+                      width: 28,
+                      height: 28,
                       decoration: BoxDecoration(
                           color: cfg.bgColor,
                           borderRadius: BorderRadius.circular(8)),
@@ -461,15 +462,15 @@ class _RecycleScreenState extends State<RecycleScreen>
       builder: (_) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text('删除记录',
+        title: Text('Delete Record',
             style: GoogleFonts.dmSans(
                 color: const Color(0xFF1A4731), fontWeight: FontWeight.w700)),
-        content: Text('确定要删除这条回收记录吗？',
+        content: Text('Are you sure you want to delete this recycling record?',
             style: GoogleFonts.dmSans(color: Colors.grey.shade600)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('取消',
+            child: Text('Cancel',
                 style: GoogleFonts.dmSans(color: Colors.grey.shade500)),
           ),
           ElevatedButton(
@@ -483,7 +484,7 @@ class _RecycleScreenState extends State<RecycleScreen>
                   borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
-            child: Text('删除',
+            child: Text('Delete',
                 style: GoogleFonts.dmSans(
                     color: Colors.white, fontWeight: FontWeight.w600)),
           ),
@@ -510,10 +511,9 @@ class _InlineAddFormState extends State<_InlineAddForm> {
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
 
-  int get _calculatedPoints =>
-      ((double.tryParse(_weightController.text) ?? 0) *
+  int get _calculatedPoints => ((double.tryParse(_weightController.text) ?? 0) *
           (categories[_selectedCategory]?.pointsPerKg ?? 10))
-          .round();
+      .round();
 
   @override
   void dispose() {
@@ -524,14 +524,15 @@ class _InlineAddFormState extends State<_InlineAddForm> {
   Future<void> _submit() async {
     final weight = double.tryParse(_weightController.text.trim());
     if (weight == null || weight <= 0) {
-      _showSnack('请输入有效的重量', isError: true);
+      _showSnack('Please enter a valid weight', isError: true);
       return;
     }
     setState(() => _isLoading = true);
     try {
       final user = supabase.auth.currentUser;
       if (user == null) return;
-      final pts = (weight * (categories[_selectedCategory]!.pointsPerKg)).round();
+      final pts =
+          (weight * (categories[_selectedCategory]!.pointsPerKg)).round();
       await supabase.from('recycle_records').insert({
         'user_id': user.id,
         'category': _selectedCategory,
@@ -543,9 +544,12 @@ class _InlineAddFormState extends State<_InlineAddForm> {
       _weightController.clear();
       setState(() => _selectedCategory = 'Plastic');
       await widget.onSuccess();
-      if (mounted) _showSnack('记录已提交！获得 $pts 积分 🎉', isError: false);
+      if (mounted)
+        _showSnack('Record submitted! You earned $pts points 🎉',
+            isError: false);
     } catch (e) {
-      if (mounted) _showSnack('提交失败，请重试', isError: true);
+      if (mounted)
+        _showSnack('Submission failed. Please try again.', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -554,7 +558,8 @@ class _InlineAddFormState extends State<_InlineAddForm> {
   void _showSnack(String msg, {required bool isError}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg, style: GoogleFonts.dmSans(color: Colors.white)),
-      backgroundColor: isError ? const Color(0xFFE05454) : const Color(0xFF3DAB6A),
+      backgroundColor:
+          isError ? const Color(0xFFE05454) : const Color(0xFF3DAB6A),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: const EdgeInsets.all(16),
@@ -571,7 +576,8 @@ class _InlineAddFormState extends State<_InlineAddForm> {
         boxShadow: [
           BoxShadow(
               color: Colors.black.withOpacity(0.05),
-              blurRadius: 16, offset: const Offset(0, 4))
+              blurRadius: 16,
+              offset: const Offset(0, 4))
         ],
       ),
       child: Column(
@@ -579,7 +585,8 @@ class _InlineAddFormState extends State<_InlineAddForm> {
         children: [
           Row(children: [
             Container(
-              width: 32, height: 32,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                     colors: [Color(0xFF4CD787), Color(0xFF2D7A4F)]),
@@ -606,7 +613,8 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                   letterSpacing: 0.8)),
           const SizedBox(height: 10),
           Wrap(
-            spacing: 10, runSpacing: 10,
+            spacing: 10,
+            runSpacing: 10,
             children: categories.keys.map((cat) {
               final cfg = categories[cat]!;
               final selected = _selectedCategory == cat;
@@ -614,8 +622,8 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                 onTap: () => setState(() => _selectedCategory = cat),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: selected ? cfg.color : cfg.bgColor,
                     borderRadius: BorderRadius.circular(12),
@@ -626,8 +634,7 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(cfg.icon,
-                        color: selected ? Colors.white : cfg.color,
-                        size: 16),
+                        color: selected ? Colors.white : cfg.color, size: 16),
                     const SizedBox(width: 6),
                     Text(cat,
                         style: GoogleFonts.dmSans(
@@ -652,8 +659,7 @@ class _InlineAddFormState extends State<_InlineAddForm> {
           const SizedBox(height: 8),
           TextField(
             controller: _weightController,
-            keyboardType:
-            const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             onChanged: (_) => setState(() {}),
             style: GoogleFonts.dmSans(
                 color: const Color(0xFF1A4731),
@@ -670,19 +676,18 @@ class _InlineAddFormState extends State<_InlineAddForm> {
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                    color: Colors.grey.shade200, width: 1.5),
+                borderSide: BorderSide(color: Colors.grey.shade200, width: 1.5),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFF3DAB6A), width: 1.5),
+                borderSide:
+                    const BorderSide(color: Color(0xFF3DAB6A), width: 1.5),
               ),
-              contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 14),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               suffixText: 'kg',
-              suffixStyle: GoogleFonts.dmSans(
-                  color: Colors.grey.shade400, fontSize: 14),
+              suffixStyle:
+                  GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 14),
             ),
           ),
 
@@ -716,8 +721,7 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                 items: recyclingStations
                     .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
-                onChanged: (v) =>
-                    setState(() => _selectedStation = v!),
+                onChanged: (v) => setState(() => _selectedStation = v!),
               ),
             ),
           ),
@@ -752,8 +756,7 @@ class _InlineAddFormState extends State<_InlineAddForm> {
               if (picked != null) setState(() => _selectedDate = picked);
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
                 color: const Color(0xFFF7F9F8),
                 borderRadius: BorderRadius.circular(12),
@@ -765,8 +768,8 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                 const SizedBox(width: 10),
                 Text(
                   '${_selectedDate.year}-'
-                      '${_selectedDate.month.toString().padLeft(2, '0')}-'
-                      '${_selectedDate.day.toString().padLeft(2, '0')}',
+                  '${_selectedDate.month.toString().padLeft(2, '0')}-'
+                  '${_selectedDate.day.toString().padLeft(2, '0')}',
                   style: GoogleFonts.dmSans(
                       color: const Color(0xFF1A4731),
                       fontSize: 14,
@@ -781,13 +784,11 @@ class _InlineAddFormState extends State<_InlineAddForm> {
               double.tryParse(_weightController.text) != null) ...[
             const SizedBox(height: 20),
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: const Color(0xFFF0FAF4),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: const Color(0xFFB8E8CC), width: 1.5),
+                border: Border.all(color: const Color(0xFFB8E8CC), width: 1.5),
               ),
               child: Row(children: [
                 const Icon(Icons.star_rounded,
@@ -821,21 +822,22 @@ class _InlineAddFormState extends State<_InlineAddForm> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2D7A4F),
                 disabledBackgroundColor:
-                const Color(0xFF2D7A4F).withOpacity(0.5),
+                    const Color(0xFF2D7A4F).withOpacity(0.5),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
                 elevation: 0,
               ),
               child: _isLoading
                   ? const SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2.5))
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2.5))
                   : Text('Submit Record',
-                  style: GoogleFonts.dmSans(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.dmSans(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
             ),
           ),
         ],
@@ -859,8 +861,7 @@ class _RecordCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cfg = categories[record.category] ??
-        categories['Plastic']!;
+    final cfg = categories[record.category] ?? categories['Plastic']!;
     final dateStr =
         '${record.date.year}-${record.date.month.toString().padLeft(2, '0')}-${record.date.day.toString().padLeft(2, '0')}';
 
@@ -873,15 +874,16 @@ class _RecordCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
               color: Colors.black.withOpacity(0.04),
-              blurRadius: 10, offset: const Offset(0, 3))
+              blurRadius: 10,
+              offset: const Offset(0, 3))
         ],
       ),
       child: Row(children: [
         Container(
-          width: 46, height: 46,
+          width: 46,
+          height: 46,
           decoration: BoxDecoration(
-              color: cfg.bgColor,
-              borderRadius: BorderRadius.circular(14)),
+              color: cfg.bgColor, borderRadius: BorderRadius.circular(14)),
           child: Icon(cfg.icon, color: cfg.color, size: 22),
         ),
         const SizedBox(width: 14),
@@ -906,13 +908,10 @@ class _RecordCard extends StatelessWidget {
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text('${record.weightKg.toStringAsFixed(1)} kg',
               style: GoogleFonts.dmSans(
-                  color: cfg.color,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700)),
+                  color: cfg.color, fontSize: 14, fontWeight: FontWeight.w700)),
           const SizedBox(height: 2),
           Row(children: [
-            const Icon(Icons.star_rounded,
-                color: Color(0xFFFFB800), size: 12),
+            const Icon(Icons.star_rounded, color: Color(0xFFFFB800), size: 12),
             const SizedBox(width: 2),
             Text('${record.points} pts',
                 style: GoogleFonts.dmSans(
@@ -924,7 +923,8 @@ class _RecordCard extends StatelessWidget {
           GestureDetector(
             onTap: onEdit,
             child: Container(
-              width: 30, height: 30,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
                   color: const Color(0xFFF0FAF4),
                   borderRadius: BorderRadius.circular(8)),
@@ -936,7 +936,8 @@ class _RecordCard extends StatelessWidget {
           GestureDetector(
             onTap: onDelete,
             child: Container(
-              width: 30, height: 30,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
                   color: const Color(0xFFFFF0F0),
                   borderRadius: BorderRadius.circular(8)),
@@ -971,8 +972,8 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
   void initState() {
     super.initState();
     final e = widget.editing;
-    _weightController = TextEditingController(
-        text: e != null ? e.weightKg.toString() : '');
+    _weightController =
+        TextEditingController(text: e != null ? e.weightKg.toString() : '');
     _selectedCategory = e?.category ?? 'Plastic';
     _selectedStation = e?.station ?? recyclingStations.first;
     _selectedDate = e?.date ?? DateTime.now();
@@ -1024,7 +1025,8 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
         children: [
           Center(
             child: Container(
-              width: 36, height: 4,
+              width: 36,
+              height: 4,
               decoration: BoxDecoration(
                   color: Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(2)),
@@ -1039,23 +1041,23 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
           const SizedBox(height: 20),
           // Category
           Wrap(
-            spacing: 8, runSpacing: 8,
+            spacing: 8,
+            runSpacing: 8,
             children: categories.keys.map((cat) {
               final cfg = categories[cat]!;
               final selected = _selectedCategory == cat;
               return GestureDetector(
                 onTap: () => setState(() => _selectedCategory = cat),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: selected ? cfg.color : cfg.bgColor,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(cfg.icon,
-                        color: selected ? Colors.white : cfg.color,
-                        size: 14),
+                        color: selected ? Colors.white : cfg.color, size: 14),
                     const SizedBox(width: 5),
                     Text(cat,
                         style: GoogleFonts.dmSans(
@@ -1071,8 +1073,7 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
           // Weight
           TextField(
             controller: _weightController,
-            keyboardType:
-            const TextInputType.numberWithOptions(decimal: true),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             style: GoogleFonts.dmSans(color: const Color(0xFF1A4731)),
             decoration: InputDecoration(
               labelText: 'Weight (kg)',
@@ -1084,8 +1085,8 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
                   borderSide: BorderSide.none),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(
-                    color: Color(0xFF3DAB6A), width: 1.5),
+                borderSide:
+                    const BorderSide(color: Color(0xFF3DAB6A), width: 1.5),
               ),
             ),
           ),
@@ -1108,14 +1109,14 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
                 items: recyclingStations
                     .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
-                onChanged: (v) =>
-                    setState(() => _selectedStation = v!),
+                onChanged: (v) => setState(() => _selectedStation = v!),
               ),
             ),
           ),
           const SizedBox(height: 20),
           SizedBox(
-            width: double.infinity, height: 50,
+            width: double.infinity,
+            height: 50,
             child: ElevatedButton(
               onPressed: _isLoading ? null : _save,
               style: ElevatedButton.styleFrom(
@@ -1126,13 +1127,13 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
               ),
               child: _isLoading
                   ? const SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2.5))
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2.5))
                   : Text('Save Changes',
-                  style: GoogleFonts.dmSans(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.dmSans(
+                          color: Colors.white, fontWeight: FontWeight.w600)),
             ),
           ),
         ],
