@@ -119,7 +119,7 @@ class _RecycleScreenState extends State<RecycleScreen>
       _records.fold(0, (sum, r) => sum + r.weightKg);
   int get _totalPoints =>
       _records.fold(0, (sum, r) => sum + r.points);
-  int get _totalCount => _records.length;
+
 
   Map<String, double> get _categoryWeights {
     final map = <String, double>{};
@@ -300,18 +300,7 @@ class _RecycleScreenState extends State<RecycleScreen>
               Text('Track your recycling records',
                   style: GoogleFonts.dmSans(
                       color: Colors.white60, fontSize: 12)),
-              const SizedBox(height: 16),
-              // Stats chips row
-              Row(children: [
-                _statChip(Icons.scale_outlined,
-                    '${_totalWeight.toStringAsFixed(1)} kg', 'Total Weight'),
-                const SizedBox(width: 10),
-                _statChip(Icons.recycling_rounded,
-                    '$_totalCount', 'Records'),
-                const SizedBox(width: 10),
-                _statChip(Icons.emoji_events_outlined,
-                    '$_totalPoints', 'Points'),
-              ]),
+
             ],
           ),
         ),
@@ -319,30 +308,6 @@ class _RecycleScreenState extends State<RecycleScreen>
     );
   }
 
-  Widget _statChip(IconData icon, String value, String label) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.18), width: 1),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(icon, color: const Color(0xFF7EEDB0), size: 16),
-          const SizedBox(height: 4),
-          Text(value,
-              style: GoogleFonts.dmSans(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700)),
-          Text(label,
-              style: GoogleFonts.dmSans(
-                  color: Colors.white.withOpacity(0.5), fontSize: 10)),
-        ]),
-      ),
-    );
-  }
 
   Widget _buildTabBar() {
     return Container(
