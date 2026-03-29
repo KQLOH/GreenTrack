@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
@@ -62,14 +62,22 @@ class _RegisterScreenState extends State<RegisterScreen>
       if (mounted) {
         _showSuccess('Registration successful!');
         await Future.delayed(const Duration(seconds: 1));
-        if (mounted) Navigator.pop(context);
+        if (mounted) {
+          Navigator.pop(context);
+        }
       }
     } on AuthException catch (e) {
-      if (mounted) _showError(e.message);
+      if (mounted) {
+        _showError(e.message);
+      }
     } catch (e) {
-      if (mounted) _showError(e.toString());
+      if (mounted) {
+        _showError(e.toString());
+      }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -150,7 +158,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF9C88FF).withOpacity(0.4),
+                            color:
+                                const Color(0xFF9C88FF).withValues(alpha: 0.4),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           )
@@ -176,10 +185,12 @@ class _RegisterScreenState extends State<RegisterScreen>
                       icon: Icons.person_outline_rounded,
                       controller: _usernameController,
                       validator: (val) {
-                        if (val == null || val.isEmpty)
+                        if (val == null || val.isEmpty) {
                           return 'Please enter a username';
-                        if (val.length < 2)
+                        }
+                        if (val.length < 2) {
                           return 'Username must be at least 2 characters';
+                        }
                         return null;
                       },
                     ),
@@ -193,10 +204,12 @@ class _RegisterScreenState extends State<RegisterScreen>
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       validator: (val) {
-                        if (val == null || val.isEmpty)
+                        if (val == null || val.isEmpty) {
                           return 'Please enter your email';
-                        if (!val.contains('@'))
+                        }
+                        if (!val.contains('@')) {
                           return 'Please enter a valid email address';
+                        }
                         return null;
                       },
                     ),
@@ -210,10 +223,12 @@ class _RegisterScreenState extends State<RegisterScreen>
                       controller: _passwordController,
                       isPassword: true,
                       validator: (val) {
-                        if (val == null || val.isEmpty)
+                        if (val == null || val.isEmpty) {
                           return 'Please enter a password';
-                        if (val.length < 6)
+                        }
+                        if (val.length < 6) {
                           return 'Password must be at least 6 characters';
+                        }
                         return null;
                       },
                     ),
@@ -227,10 +242,12 @@ class _RegisterScreenState extends State<RegisterScreen>
                       controller: _confirmPasswordController,
                       isPassword: true,
                       validator: (val) {
-                        if (val == null || val.isEmpty)
+                        if (val == null || val.isEmpty) {
                           return 'Please confirm your password';
-                        if (val != _passwordController.text)
+                        }
+                        if (val != _passwordController.text) {
                           return 'Passwords do not match';
+                        }
                         return null;
                       },
                     ),
@@ -244,7 +261,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF6C63FF),
                           disabledBackgroundColor:
-                              const Color(0xFF6C63FF).withOpacity(0.5),
+                              const Color(0xFF6C63FF).withValues(alpha: 0.5),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16)),
                           elevation: 0,
