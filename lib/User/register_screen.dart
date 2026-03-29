@@ -60,7 +60,7 @@ class _RegisterScreenState extends State<RegisterScreen>
         username: _usernameController.text.trim(),
       );
       if (mounted) {
-        _showSuccess('注册成功！');
+        _showSuccess('Registration successful!');
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) Navigator.pop(context);
       }
@@ -78,7 +78,9 @@ class _RegisterScreenState extends State<RegisterScreen>
       content: Row(children: [
         const Icon(Icons.error_outline, color: Colors.white, size: 18),
         const SizedBox(width: 10),
-        Expanded(child: Text(message, style: GoogleFonts.dmSans(color: Colors.white))),
+        Expanded(
+            child:
+                Text(message, style: GoogleFonts.dmSans(color: Colors.white))),
       ]),
       backgroundColor: const Color(0xFFFF6B6B),
       behavior: SnackBarBehavior.floating,
@@ -92,7 +94,9 @@ class _RegisterScreenState extends State<RegisterScreen>
       content: Row(children: [
         const Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
         const SizedBox(width: 10),
-        Expanded(child: Text(message, style: GoogleFonts.dmSans(color: Colors.white))),
+        Expanded(
+            child:
+                Text(message, style: GoogleFonts.dmSans(color: Colors.white))),
       ]),
       backgroundColor: const Color(0xFF4CAF82),
       behavior: SnackBarBehavior.floating,
@@ -121,11 +125,13 @@ class _RegisterScreenState extends State<RegisterScreen>
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: Container(
-                        width: 42, height: 42,
+                        width: 42,
+                        height: 42,
                         decoration: BoxDecoration(
                           color: const Color(0xFF1E1E2E),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF2A2A3E), width: 1.5),
+                          border: Border.all(
+                              color: const Color(0xFF2A2A3E), width: 1.5),
                         ),
                         child: const Icon(Icons.arrow_back_ios_new_rounded,
                             color: Colors.white70, size: 16),
@@ -133,7 +139,8 @@ class _RegisterScreenState extends State<RegisterScreen>
                     ),
                     const SizedBox(height: 40),
                     Container(
-                      width: 60, height: 60,
+                      width: 60,
+                      height: 60,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [Color(0xFF9C88FF), Color(0xFF6C63FF)],
@@ -141,31 +148,38 @@ class _RegisterScreenState extends State<RegisterScreen>
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(18),
-                        boxShadow: [BoxShadow(
-                          color: const Color(0xFF9C88FF).withOpacity(0.4),
-                          blurRadius: 20, offset: const Offset(0, 8),
-                        )],
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF9C88FF).withOpacity(0.4),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          )
+                        ],
                       ),
-                      child: const Icon(Icons.person_add_outlined, color: Colors.white, size: 28),
+                      child: const Icon(Icons.person_add_outlined,
+                          color: Colors.white, size: 28),
                     ),
                     const SizedBox(height: 32),
                     Text('Create account',
                         style: GoogleFonts.dmSerifDisplay(
                             color: Colors.white, fontSize: 36, height: 1.1)),
                     const SizedBox(height: 8),
-                    Text('注册一个新账号开始使用',
-                        style: GoogleFonts.dmSans(color: Colors.white38, fontSize: 15)),
+                    Text('Create a new account to get started',
+                        style: GoogleFonts.dmSans(
+                            color: Colors.white38, fontSize: 15)),
                     const SizedBox(height: 48),
 
                     // Username
                     CustomTextField(
                       label: 'USERNAME',
-                      hint: '你的用户名',
+                      hint: 'Your username',
                       icon: Icons.person_outline_rounded,
                       controller: _usernameController,
                       validator: (val) {
-                        if (val == null || val.isEmpty) return '请输入用户名';
-                        if (val.length < 2) return '用户名至少2位';
+                        if (val == null || val.isEmpty)
+                          return 'Please enter a username';
+                        if (val.length < 2)
+                          return 'Username must be at least 2 characters';
                         return null;
                       },
                     ),
@@ -179,8 +193,10 @@ class _RegisterScreenState extends State<RegisterScreen>
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       validator: (val) {
-                        if (val == null || val.isEmpty) return '请输入邮箱';
-                        if (!val.contains('@')) return '请输入有效的邮箱地址';
+                        if (val == null || val.isEmpty)
+                          return 'Please enter your email';
+                        if (!val.contains('@'))
+                          return 'Please enter a valid email address';
                         return null;
                       },
                     ),
@@ -189,13 +205,15 @@ class _RegisterScreenState extends State<RegisterScreen>
                     // Password
                     CustomTextField(
                       label: 'PASSWORD',
-                      hint: '至少6位密码',
+                      hint: 'At least 6 characters',
                       icon: Icons.lock_outline_rounded,
                       controller: _passwordController,
                       isPassword: true,
                       validator: (val) {
-                        if (val == null || val.isEmpty) return '请输入密码';
-                        if (val.length < 6) return '密码至少6位';
+                        if (val == null || val.isEmpty)
+                          return 'Please enter a password';
+                        if (val.length < 6)
+                          return 'Password must be at least 6 characters';
                         return null;
                       },
                     ),
@@ -204,39 +222,45 @@ class _RegisterScreenState extends State<RegisterScreen>
                     // Confirm Password
                     CustomTextField(
                       label: 'CONFIRM PASSWORD',
-                      hint: '再次输入密码',
+                      hint: 'Enter password again',
                       icon: Icons.lock_person_outlined,
                       controller: _confirmPasswordController,
                       isPassword: true,
                       validator: (val) {
-                        if (val == null || val.isEmpty) return '请确认密码';
-                        if (val != _passwordController.text) return '两次密码不一致';
+                        if (val == null || val.isEmpty)
+                          return 'Please confirm your password';
+                        if (val != _passwordController.text)
+                          return 'Passwords do not match';
                         return null;
                       },
                     ),
                     const SizedBox(height: 36),
 
                     SizedBox(
-                      width: double.infinity, height: 56,
+                      width: double.infinity,
+                      height: 56,
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _register,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF6C63FF),
                           disabledBackgroundColor:
-                          const Color(0xFF6C63FF).withOpacity(0.5),
+                              const Color(0xFF6C63FF).withOpacity(0.5),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16)),
                           elevation: 0,
                         ),
                         child: _isLoading
-                            ? const SizedBox(width: 22, height: 22,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2.5))
-                            : Text('注册',
-                            style: GoogleFonts.dmSans(
-                                color: Colors.white, fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5)),
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2.5))
+                            : Text('Register',
+                                style: GoogleFonts.dmSans(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5)),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -249,8 +273,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                             style: GoogleFonts.dmSans(
                                 color: Colors.white38, fontSize: 14),
                             children: [
-                              const TextSpan(text: '已有账号? '),
-                              TextSpan(text: '立即登录',
+                              const TextSpan(text: 'Already have an account? '),
+                              TextSpan(
+                                  text: 'Sign in now',
                                   style: GoogleFonts.dmSans(
                                       color: const Color(0xFF9C88FF),
                                       fontWeight: FontWeight.w600)),

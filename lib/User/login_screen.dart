@@ -64,7 +64,8 @@ class _LoginScreenState extends State<LoginScreen>
     } on AuthException catch (e) {
       if (mounted) _showError(e.message);
     } catch (e) {
-      if (mounted) _showError('发生未知错误，请重试');
+      if (mounted)
+        _showError('An unexpected error occurred. Please try again.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -78,15 +79,14 @@ class _LoginScreenState extends State<LoginScreen>
             const Icon(Icons.error_outline, color: Colors.white, size: 18),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(message,
-                  style: GoogleFonts.dmSans(color: Colors.white)),
+              child:
+                  Text(message, style: GoogleFonts.dmSans(color: Colors.white)),
             ),
           ],
         ),
         backgroundColor: Colors.red.shade600,
         behavior: SnackBarBehavior.floating,
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
       ),
     );
@@ -193,8 +193,10 @@ class _LoginScreenState extends State<LoginScreen>
                               controller: _emailController,
                               keyboardType: TextInputType.emailAddress,
                               validator: (val) {
-                                if (val == null || val.isEmpty) return '请输入邮箱';
-                                if (!val.contains('@')) return '请输入有效的邮箱地址';
+                                if (val == null || val.isEmpty)
+                                  return 'Please enter your email';
+                                if (!val.contains('@'))
+                                  return 'Please enter a valid email address';
                                 return null;
                               },
                             ),
@@ -204,13 +206,15 @@ class _LoginScreenState extends State<LoginScreen>
                             // Password field
                             _GreenTextField(
                               label: 'PASSWORD',
-                              hint: '输入密码',
+                              hint: 'Enter your password',
                               icon: Icons.lock_outline_rounded,
                               controller: _passwordController,
                               isPassword: true,
                               validator: (val) {
-                                if (val == null || val.isEmpty) return '请输入密码';
-                                if (val.length < 6) return '密码至少6位';
+                                if (val == null || val.isEmpty)
+                                  return 'Please enter a password';
+                                if (val.length < 6)
+                                  return 'Password must be at least 6 characters';
                                 return null;
                               },
                             ),
@@ -226,7 +230,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF4CD787),
                                   disabledBackgroundColor:
-                                  const Color(0xFF4CD787).withOpacity(0.5),
+                                      const Color(0xFF4CD787).withOpacity(0.5),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
@@ -234,22 +238,22 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                                 child: _isLoading
                                     ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2.5,
-                                  ),
-                                )
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2.5,
+                                        ),
+                                      )
                                     : Text(
-                                  'Login',
-                                  style: GoogleFonts.dmSans(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.3,
-                                  ),
-                                ),
+                                        'Login',
+                                        style: GoogleFonts.dmSans(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
                               ),
                             ),
 
@@ -296,7 +300,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     width: 1.5,
                                   ),
                                   backgroundColor:
-                                  Colors.white.withOpacity(0.08),
+                                      Colors.white.withOpacity(0.08),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
@@ -442,15 +446,15 @@ class _GreenTextFieldState extends State<_GreenTextField> {
                 color: Colors.white.withOpacity(0.6), size: 20),
             suffixIcon: widget.isPassword
                 ? IconButton(
-              icon: Icon(
-                _obscure
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-                color: Colors.white.withOpacity(0.5),
-                size: 20,
-              ),
-              onPressed: () => setState(() => _obscure = !_obscure),
-            )
+                    icon: Icon(
+                      _obscure
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: Colors.white.withOpacity(0.5),
+                      size: 20,
+                    ),
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                  )
                 : null,
             filled: true,
             fillColor: Colors.white.withOpacity(0.10),
@@ -486,10 +490,10 @@ class _GreenTextFieldState extends State<_GreenTextField> {
                 width: 1.5,
               ),
             ),
-            errorStyle:
-            GoogleFonts.dmSans(color: const Color(0xFFFF8F8F), fontSize: 12),
+            errorStyle: GoogleFonts.dmSans(
+                color: const Color(0xFFFF8F8F), fontSize: 12),
             contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           ),
         ),
       ],

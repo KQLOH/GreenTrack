@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
+import 'user/login_screen.dart';
+import 'user/main_navigation_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -59,7 +59,7 @@ class _AuthGateState extends State<AuthGate> {
   Widget build(BuildContext context) {
     final session = supabase.auth.currentSession;
     if (session != null) {
-      return const HomeScreen();
+      return const MainNavigationScreen();
     }
     return const LoginScreen();
   }

@@ -8,8 +8,6 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  int _currentIndex = 0;
-
   final List<_SummaryData> _summaryItems = const <_SummaryData>[
     _SummaryData(
       title: 'Recycled Weight',
@@ -59,7 +57,15 @@ class _DashboardPageState extends State<DashboardPage> {
   ];
 
   final List<double> _weeklyValues = const <double>[32, 48, 24, 60, 44, 52, 36];
-  final List<String> _weekLabels = const <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  final List<String> _weekLabels = const <String>[
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun'
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -114,24 +120,6 @@ class _DashboardPageState extends State<DashboardPage> {
             ],
           ),
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (int index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: primaryGreen,
-        unselectedItemColor: Colors.green.shade300,
-        showUnselectedLabels: true,
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.analytics_rounded), label: 'Analytics'),
-          BottomNavigationBarItem(icon: Icon(Icons.explore_rounded), label: 'Explore'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
-        ],
       ),
     );
   }
@@ -240,7 +228,8 @@ class _DashboardPageState extends State<DashboardPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List<Widget>.generate(_weeklyValues.length, (int index) {
+              children:
+                  List<Widget>.generate(_weeklyValues.length, (int index) {
                 final double value = _weeklyValues[index];
                 return Column(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -485,4 +474,3 @@ class _ActivityData {
   final String trailing;
   final IconData icon;
 }
-
