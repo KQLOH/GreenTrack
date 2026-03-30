@@ -9,7 +9,6 @@ import '../services/supabase_client.dart';
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // No API key needed, uses OpenStreetMap (completely free).
-// Mock data for Melaka, replace with real data later.
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // â”€â”€â”€ Accepted recycling material types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -65,127 +64,6 @@ class RecyclingCenter {
   });
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Mock data: Melaka recycling centers.
-// Replace this list with real data from Supabase or API later
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-final List<RecyclingCenter> _mockCenters = [
-  RecyclingCenter(
-    id: '1',
-    name: 'EcoPoint Melaka Central',
-    address: 'Jalan Hang Tuah, Melaka Tengah, 75300 Melaka',
-    location: const LatLng(2.1946, 102.2501),
-    rating: 4.2,
-    isOpen: true,
-    phoneNumber: '06-282 1234',
-    openingHours: [
-      'Monday: 8:00 AM â€“ 5:00 PM',
-      'Tuesday: 8:00 AM â€“ 5:00 PM',
-      'Wednesday: 8:00 AM â€“ 5:00 PM',
-      'Thursday: 8:00 AM â€“ 5:00 PM',
-      'Friday: 8:00 AM â€“ 5:00 PM',
-      'Saturday: 8:00 AM â€“ 1:00 PM',
-      'Sunday: Closed',
-    ],
-    acceptedTypes: ['Plastic', 'Paper', 'Glass', 'Metal'],
-  ),
-  RecyclingCenter(
-    id: '2',
-    name: 'Pusat Kitar Semula Bukit Beruang',
-    address: 'Taman Bukit Beruang Indah, 75450 Melaka',
-    location: const LatLng(2.2156, 102.2832),
-    rating: 3.8,
-    isOpen: false,
-    phoneNumber: '06-231 5678',
-    openingHours: [
-      'Monday: 9:00 AM â€“ 6:00 PM',
-      'Tuesday: 9:00 AM â€“ 6:00 PM',
-      'Wednesday: 9:00 AM â€“ 6:00 PM',
-      'Thursday: 9:00 AM â€“ 6:00 PM',
-      'Friday: 9:00 AM â€“ 6:00 PM',
-      'Saturday: 9:00 AM â€“ 2:00 PM',
-      'Sunday: Closed',
-    ],
-    acceptedTypes: ['Plastic', 'Paper', 'E-Waste', 'Clothes'],
-  ),
-  RecyclingCenter(
-    id: '3',
-    name: 'EcoPoint Ayer Keroh',
-    address: 'Lebuh Ayer Keroh, 75450 Ayer Keroh, Melaka',
-    location: const LatLng(2.2601, 102.2742),
-    rating: 4.5,
-    isOpen: true,
-    phoneNumber: '06-233 9012',
-    openingHours: [
-      'Monday: 8:00 AM â€“ 6:00 PM',
-      'Tuesday: 8:00 AM â€“ 6:00 PM',
-      'Wednesday: 8:00 AM â€“ 6:00 PM',
-      'Thursday: 8:00 AM â€“ 6:00 PM',
-      'Friday: 8:00 AM â€“ 6:00 PM',
-      'Saturday: 8:00 AM â€“ 4:00 PM',
-      'Sunday: 9:00 AM â€“ 12:00 PM',
-    ],
-    acceptedTypes: ['Plastic', 'Paper', 'Glass', 'Metal', 'E-Waste'],
-  ),
-  RecyclingCenter(
-    id: '4',
-    name: 'Recycle Hub Banda Hilir',
-    address: 'Jalan Parameswara, Banda Hilir, 75000 Melaka',
-    location: const LatLng(2.1969, 102.2431),
-    rating: 4.0,
-    isOpen: true,
-    phoneNumber: '06-284 3456',
-    openingHours: [
-      'Monday: 8:30 AM â€“ 5:30 PM',
-      'Tuesday: 8:30 AM â€“ 5:30 PM',
-      'Wednesday: 8:30 AM â€“ 5:30 PM',
-      'Thursday: 8:30 AM â€“ 5:30 PM',
-      'Friday: 8:30 AM â€“ 5:30 PM',
-      'Saturday: 8:30 AM â€“ 1:30 PM',
-      'Sunday: Closed',
-    ],
-    acceptedTypes: ['Plastic', 'Paper', 'Clothes'],
-  ),
-  RecyclingCenter(
-    id: '5',
-    name: 'Pusat Kitar Semula Cheng',
-    address: 'Taman Cheng Baru, 75250 Cheng, Melaka',
-    location: const LatLng(2.2310, 102.2620),
-    rating: 3.5,
-    isOpen: false,
-    phoneNumber: null,
-    openingHours: [
-      'Monday: 9:00 AM â€“ 5:00 PM',
-      'Tuesday: 9:00 AM â€“ 5:00 PM',
-      'Wednesday: 9:00 AM â€“ 5:00 PM',
-      'Thursday: 9:00 AM â€“ 5:00 PM',
-      'Friday: 9:00 AM â€“ 5:00 PM',
-      'Saturday: 9:00 AM â€“ 1:00 PM',
-      'Sunday: Closed',
-    ],
-    acceptedTypes: ['Plastic', 'Paper', 'Metal', 'Glass'],
-  ),
-  RecyclingCenter(
-    id: '6',
-    name: 'EcoGreen Bachang',
-    address: 'Jalan Bachang, Taman Bachang, 75350 Melaka',
-    location: const LatLng(2.2089, 102.2378),
-    rating: 4.1,
-    isOpen: true,
-    phoneNumber: '06-285 7890',
-    openingHours: [
-      'Monday: 8:00 AM â€“ 6:00 PM',
-      'Tuesday: 8:00 AM â€“ 6:00 PM',
-      'Wednesday: 8:00 AM â€“ 6:00 PM',
-      'Thursday: 8:00 AM â€“ 6:00 PM',
-      'Friday: 8:00 AM â€“ 6:00 PM',
-      'Saturday: 8:00 AM â€“ 3:00 PM',
-      'Sunday: Closed',
-    ],
-    acceptedTypes: ['Plastic', 'Paper', 'E-Waste', 'Metal', 'Clothes'],
-  ),
-];
-
 // â”€â”€â”€ Map Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class RecycleMapScreen extends StatefulWidget {
@@ -204,7 +82,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
   RecyclingCenter? _selectedCenter;
 
   bool _isLoading = true;
-  bool _usingMockData = false;
   int _radiusKm = 5;
 
   late AnimationController _sheetAnim;
@@ -239,7 +116,7 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     });
     try {
       if (!await _requestPermission()) {
-        // Permission denied â€” still show map with mock data centered on Melaka
+        // Permission denied, still show map centered on Melaka.
         setState(() {
           _currentPosition = _melakaCenter;
         });
@@ -317,14 +194,9 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     final origin = _currentPosition ?? _melakaCenter;
 
     try {
-      final dbCenters = await _fetchCentersFromDb();
-      _allCenters = dbCenters.isEmpty
-          ? List<RecyclingCenter>.from(_mockCenters)
-          : dbCenters;
-      _usingMockData = dbCenters.isEmpty;
+      _allCenters = await _fetchCentersFromDb();
     } catch (_) {
-      _allCenters = List<RecyclingCenter>.from(_mockCenters);
-      _usingMockData = true;
+      _allCenters = <RecyclingCenter>[];
     }
 
     final withDistance = _allCenters.map((c) {
@@ -497,7 +369,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
         if (_isLoading) _buildLoadingOverlay(),
         if (_selectedCenter != null) _buildDetailSheet(),
         if (!_isLoading) _buildCountBadge(),
-        if (_usingMockData) _buildMockBanner(),
       ]),
     );
   }
@@ -712,42 +583,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     );
   }
 
-  // â”€â”€ Mock Data Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-  Widget _buildMockBanner() {
-    return Positioned(
-      top: MediaQuery.of(context).padding.top + 116,
-      left: 16,
-      right: 16,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF8E1),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-              color: const Color(0xFFE8A020).withValues(alpha: 0.4), width: 1),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 6,
-                offset: const Offset(0, 2))
-          ],
-        ),
-        child: Row(children: [
-          const Icon(Icons.info_outline_rounded,
-              color: Color(0xFFE8A020), size: 14),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text('Showing mock data â€” replace with real centres later',
-                style: GoogleFonts.dmSans(
-                    color: const Color(0xFFB07800),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500)),
-          ),
-        ]),
-      ),
-    );
-  }
 
   // â”€â”€ Count Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
