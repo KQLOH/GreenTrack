@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../admin/admin_module_screen.dart';
 import '../services/supabase_client.dart';
 
 final _supabase = supabaseClient;
@@ -13,6 +14,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
+  bool _isAdmin = false;
   Map<String, dynamic>? _profile;
   double _totalWeight = 0;
   double _co2Saved = 0;
@@ -31,11 +33,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (user == null) return;
 
       // Load profile
-      final profile = await _supabase
-          .from('profiles')
-          .select('id, username, created_at, total_points')
-          .eq('id', user.id)
-          .single();
+      final profile =
+          await _supabase.from('profiles').select().eq('id', user.id).single();
 
       // Load recycle stats
       final records = await _supabase
@@ -51,9 +50,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
 
       if (mounted) {
+        final role = (profile['role'] ?? '').toString().toLowerCase();
+        final isAdminFlag = profile['is_admin'] == true;
         setState(() {
           _profile = Map<String, dynamic>.from(profile);
           _profile!['email'] = user.email ?? '';
+          _isAdmin = isAdminFlag || role == 'admin';
           _totalWeight = totalWeight;
           _co2Saved = totalWeight * 2.5;
           _totalPoints = totalPoints;
@@ -126,6 +128,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (_) => _EditUsernameSheet(controller: controller),
     );
     if (result == true) await _loadData();
+  }
+
+  void _openAdminModule() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AdminModuleScreen()),
+    );
   }
 
   @override
@@ -374,6 +383,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           isLast: true,
                         ),
                       ]),
+
+                      if (_isAdmin) ...[
+                        const SizedBox(height: 24),
+                        _sectionLabel('Administration'),
+                        const SizedBox(height: 10),
+                        _menuGroup([
+                          _MenuItem(
+                            icon: Icons.admin_panel_settings_rounded,
+                            iconColor: const Color(0xFF2D7A4F),
+                            emojiColor: const Color(0xFFE8F5EE),
+                            title: 'Admin Control Center',
+                            subtitle: 'Manage users, records, and stations',
+                            onTap: _openAdminModule,
+                            isLast: true,
+                          ),
+                        ]),
+                      ],
 
                       const SizedBox(height: 28),
 
