@@ -29,12 +29,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   Map<String, double> _categoryBreakdown = {};
   List<Map<String, dynamic>> _recentActivity = [];
 
-  // Nearby stations (static for Melaka)
-  final List<Map<String, dynamic>> _stations = [
-    {'name': 'EcoPoint Melaka Central', 'distance': '0.8 km', 'open': true},
-    {'name': 'EcoPoint Bukit Beruang', 'distance': '2.1 km', 'open': true},
-    {'name': 'EcoPoint Ayer Keroh', 'distance': '3.4 km', 'open': false},
-  ];
+  // Nearby stations loaded from Supabase `recycling_stations`.
+  List<Map<String, dynamic>> _stations = [];
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnim;
@@ -86,6 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       int totalPoints = 0;
       final List<double> weeklyBars = List.filled(7, 0);
       final Map<String, double> catBreakdown = {};
+      final List<Map<String, dynamic>> stations = [];
 
       for (final r in records as List) {
         final date = DateTime.parse(r['date']);
@@ -111,6 +108,28 @@ class _DashboardScreenState extends State<DashboardScreen>
       // CO2 saved: ~2.5 kg CO2 per kg recycled (average)
       final co2 = monthlyWeight * 2.5;
 
+      try {
+        final stationRows = await supabase
+            .from('recycling_stations')
+            .select('name, address, is_open')
+            .order('created_at', ascending: false)
+            .limit(10);
+
+        for (final row in stationRows as List) {
+          final map = Map<String, dynamic>.from(row as Map);
+          final name = (map['name'] ?? '').toString().trim();
+          if (name.isEmpty) continue;
+
+          stations.add({
+            'name': name,
+            'distance': (map['address'] ?? '').toString(),
+            'open': map['is_open'] == null ? true : map['is_open'] == true,
+          });
+        }
+      } catch (_) {
+        // Keep station list empty if table/columns are unavailable.
+      }
+
       final recent = (records as List).take(5).toList();
 
       if (mounted) {
@@ -122,6 +141,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           _totalPoints = totalPoints;
           _weeklyBarData = weeklyBars;
           _categoryBreakdown = catBreakdown;
+          _stations = stations;
           _recentActivity =
               recent.map((e) => Map<String, dynamic>.from(e)).toList();
           _isLoading = false;
@@ -591,6 +611,31 @@ class _DashboardScreenState extends State<DashboardScreen>
   // â”€â”€ Nearby Stations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildNearbyStations() {
+    if (_stations.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle('Nearby Stations'),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              'No stations available yet.',
+              style: GoogleFonts.dmSans(
+                color: Colors.grey.shade600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'dashboard_page.dart';
+import 'dashboard_screen.dart';
 import 'profile_screen.dart';
 import 'recycle_map_screen.dart';
 import 'recycle_screen.dart';
@@ -16,7 +16,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
   static const List<Widget> _pages = <Widget>[
-    DashboardPage(),
+    DashboardScreen(),
     RecyclePage(),
     ExplorePage(),
     ProfilePage(),

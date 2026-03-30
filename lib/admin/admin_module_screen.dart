@@ -3,6 +3,9 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'tabs/admin_dashboard_tab.dart';
+import 'tabs/admin_stations_tab.dart';
+import 'tabs/admin_users_tab.dart';
 import '../services/supabase_client.dart';
 
 class AdminModuleScreen extends StatefulWidget {
@@ -40,7 +43,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging &&
           _currentTabIndex != _tabController.index) {
@@ -151,6 +154,40 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       _pendingRecords = List<Map<String, dynamic>>.from(data as List);
     } catch (_) {
       _pendingRecords = <Map<String, dynamic>>[];
+    }
+  }
+
+  Future<void> _moderatePendingRecord(
+    Map<String, dynamic> record,
+    bool approved,
+  ) async {
+    final recordId = record['id'];
+    if (recordId == null) {
+      _showSnack('Invalid record id.', isError: true);
+      return;
+    }
+
+    final status = approved ? 'approved' : 'rejected';
+
+    try {
+      await _supabase
+          .from('recycle_records')
+          .update({'status': status}).eq('id', recordId);
+
+      await Future.wait([
+        _loadPendingRecords(),
+        _loadRecords(),
+      ]);
+
+      if (!mounted) return;
+      setState(() {});
+      _showSnack(
+        approved ? 'Record approved.' : 'Record rejected.',
+        isError: false,
+      );
+    } catch (error) {
+      _showSnack('Failed to update record status.', isError: true);
+      debugPrint('Moderation update error: $error');
     }
   }
 
@@ -777,11 +814,46 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
               controller: _tabController,
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                _buildOverviewTab(),
-                _buildUsersTab(),
-                _buildRecordsTab(),
-                _buildPendingSubmissionsTab(),
-                _buildStationsTab(),
+                AdminDashboardTab(
+                  users: _users,
+                  records: _records,
+                  pendingRecords: _pendingRecords,
+                  onRefresh: _loadAllData,
+                  onModerateRecord: _moderatePendingRecord,
+                ),
+                AdminUsersTab(
+                  users: _users,
+                  onRefresh: _loadUsers,
+                ),
+                AdminStationsTab(
+                  stations: _stations,
+                  stationsLoadError: _stationsLoadError,
+                  selectedStationPoint: _selectedStationPoint,
+                  isSavingStation: _isSavingStation,
+                  mapController: _stationMapController,
+                  onRefresh: _loadStations,
+                  onAddStation: () => _openAddStationSheet(
+                    initialPoint: _selectedStationPoint,
+                  ),
+                  onEditStation: (station) {
+                    final point = _stationPointFromMap(station);
+                    _openAddStationSheet(
+                      initialPoint: point ?? _selectedStationPoint,
+                      editingStation: station,
+                    );
+                  },
+                  onDeleteStation: _confirmDeleteStation,
+                  onSelectStationPoint: (point) {
+                    setState(() => _selectedStationPoint = point);
+                  },
+                  onPickStation: (station) {
+                    _showSnack(
+                      'Selected: ${station['name'] ?? 'Station'}',
+                      isError: false,
+                    );
+                  },
+                  stationPointFromMap: _stationPointFromMap,
+                ),
               ],
             ),
       bottomNavigationBar: NavigationBar(
@@ -809,25 +881,13 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
             icon: Icon(Icons.dashboard_rounded, color: Colors.white70),
             selectedIcon:
                 Icon(Icons.dashboard_rounded, color: Color(0xFF1A4731)),
-            label: 'Overview',
+            label: 'Dashboard',
           ),
           NavigationDestination(
             icon: Icon(Icons.people_alt_rounded, color: Colors.white70),
             selectedIcon:
                 Icon(Icons.people_alt_rounded, color: Color(0xFF1A4731)),
             label: 'Users',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.recycling_rounded, color: Colors.white70),
-            selectedIcon:
-                Icon(Icons.recycling_rounded, color: Color(0xFF1A4731)),
-            label: 'Records',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.pending_actions_rounded, color: Colors.white70),
-            selectedIcon:
-                Icon(Icons.pending_actions_rounded, color: Color(0xFF1A4731)),
-            label: 'Pending',
           ),
           NavigationDestination(
             icon: Icon(Icons.location_on_rounded, color: Colors.white70),
@@ -841,460 +901,59 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
   }
 
   Widget _buildOverviewTab() {
-    return RefreshIndicator(
+    return AdminDashboardTab(
+      users: _users,
+      records: _records,
+      pendingRecords: _pendingRecords,
       onRefresh: _loadAllData,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _sectionHeader(
-            title: 'Overview',
-            subtitle: 'Realtime snapshot of platform activity.',
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _statCard(
-                  title: 'Total Users',
-                  value: _totalUsers.toString(),
-                  icon: Icons.people_alt_rounded,
-                  color: _primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _statCard(
-                  title: 'Records',
-                  value: _totalRecords.toString(),
-                  icon: Icons.recycling_rounded,
-                  color: const Color(0xFF4A90D9),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _statCard(
-            title: 'Estimated Carbon Saved',
-            value: '${_totalCarbonSaved.toStringAsFixed(1)} kg CO2',
-            icon: Icons.eco_rounded,
-            color: const Color(0xFF66BB6A),
-          ),
-          const SizedBox(height: 20),
-          _simpleSectionCard(
-            title: 'System Notes',
-            child: Text(
-              'Use this module to manage users, recycling records, and stations. '
-              'Changes apply to all users in the system.',
-              style: GoogleFonts.dmSans(
-                color: Colors.black87,
-                fontSize: 14,
-              ),
-            ),
-          ),
-        ],
-      ),
+      onModerateRecord: _moderatePendingRecord,
     );
   }
 
   Widget _buildUsersTab() {
-    return RefreshIndicator(
+    return AdminUsersTab(
+      users: _users,
       onRefresh: _loadUsers,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _sectionHeader(
-            title: 'Users',
-            subtitle: 'Registered users and point balances.',
-          ),
-          const SizedBox(height: 12),
-          ..._users.map((user) {
-            return _simpleSectionCard(
-              title: user['username']?.toString() ?? 'Unknown',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Email: ${user['email'] ?? '-'}',
-                    style: GoogleFonts.dmSans(color: Colors.grey.shade700),
-                  ),
-                  const SizedBox(height: 6),
-                  _chip(
-                    Icons.workspace_premium_rounded,
-                    'Points: ${user['total_points'] ?? 0}',
-                    const Color(0xFFE8F5EE),
-                    _primary,
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
     );
   }
 
   Widget _buildRecordsTab() {
-    return RefreshIndicator(
-      onRefresh: _loadRecords,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _sectionHeader(
-            title: 'Approved or Rejected Records',
-            subtitle: 'Audit list for processed submissions.',
-          ),
-          const SizedBox(height: 12),
-          ..._records.map((record) {
-            final status = (record['status'] ?? '').toString().toLowerCase();
-            final statusColor = status == 'approved'
-                ? const Color(0xFF3DAB6A)
-                : const Color(0xFFE05454);
-            return _simpleSectionCard(
-              title: '${record['category']} - ${record['weight_kg']} kg',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _chip(
-                        Icons.storefront_rounded,
-                        (record['station'] ?? '-').toString(),
-                        const Color(0xFFF7F9F8),
-                        _ink,
-                      ),
-                      _chip(
-                        status == 'approved'
-                            ? Icons.check_circle_rounded
-                            : Icons.cancel_rounded,
-                        status.isEmpty ? 'unknown' : status,
-                        statusColor.withValues(alpha: 0.12),
-                        statusColor,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Date: ${(record['date']?.toString() ?? '-').split('T').first}',
-                    style: GoogleFonts.dmSans(color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
+    return _buildOverviewTab();
   }
 
   Widget _buildPendingSubmissionsTab() {
-    if (_pendingRecords.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.done_all_rounded,
-                size: 60, color: Color(0xFF3DAB6A)),
-            const SizedBox(height: 16),
-            Text(
-              'All caught up!',
-              style: GoogleFonts.dmSans(
-                color: _ink,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadPendingRecords,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _sectionHeader(
-            title: 'Pending Submissions',
-            subtitle:
-                'Review queue. Action wiring can be added to backend RPC.',
-          ),
-          const SizedBox(height: 12),
-          ..._pendingRecords.map((record) {
-            return _simpleSectionCard(
-              title: '${record['category']} - ${record['weight_kg']} kg',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Station: ${record['station'] ?? '-'}',
-                    style: GoogleFonts.dmSans(color: Colors.grey.shade700),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _showSnack(
-                            'Approve action not wired yet.',
-                            isError: true,
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF3DAB6A),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          icon: const Icon(Icons.check_rounded, size: 16),
-                          label: const Text('Approve'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _showSnack(
-                            'Reject action not wired yet.',
-                            isError: true,
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFE05454),
-                            side: const BorderSide(color: Color(0xFFE05454)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          icon: const Icon(Icons.close_rounded, size: 16),
-                          label: const Text('Reject'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
+    return _buildOverviewTab();
   }
 
   Widget _buildStationsTab() {
-    final markers = <Marker>[
-      ..._stations.map((station) {
-        final point = _stationPointFromMap(station);
-        if (point == null) {
-          return Marker(
-            point: _selectedStationPoint,
-            width: 0,
-            height: 0,
-            child: const SizedBox.shrink(),
-          );
-        }
-
-        return Marker(
-          point: point,
-          width: 40,
-          height: 40,
-          child: GestureDetector(
-            onTap: () {
-              setState(() => _selectedStationPoint = point);
-              _showSnack('Selected: ${station['name'] ?? 'Station'}',
-                  isError: false);
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF4A90D9),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              child: const Icon(
-                Icons.recycling_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-            ),
-          ),
-        );
-      }).where((m) => m.width > 0),
-      Marker(
-        point: _selectedStationPoint,
-        width: 48,
-        height: 48,
-        child: Container(
-          decoration: BoxDecoration(
-            color: _primary,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2.5),
-            boxShadow: [
-              BoxShadow(
-                color: _primary.withValues(alpha: 0.42),
-                blurRadius: 10,
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.add_location_alt_rounded,
-            color: Colors.white,
-            size: 24,
-          ),
-        ),
-      ),
-    ];
-
-    return RefreshIndicator(
+    return AdminStationsTab(
+      stations: _stations,
+      stationsLoadError: _stationsLoadError,
+      selectedStationPoint: _selectedStationPoint,
+      isSavingStation: _isSavingStation,
+      mapController: _stationMapController,
       onRefresh: _loadStations,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _sectionHeader(
-            title: 'Station Manager',
-            subtitle: 'Tap map to choose location, then add station.',
-            action: ElevatedButton.icon(
-              onPressed: _isSavingStation
-                  ? null
-                  : () => _openAddStationSheet(
-                        initialPoint: _selectedStationPoint,
-                      ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              icon: const Icon(Icons.add_location_alt_rounded, size: 16),
-              label: const Text('Add Station'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _simpleSectionCard(
-            title: 'Map Picker',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: SizedBox(
-                    height: 270,
-                    child: FlutterMap(
-                      mapController: _stationMapController,
-                      options: MapOptions(
-                        initialCenter: _selectedStationPoint,
-                        initialZoom: 13.5,
-                        onTap: (_, point) {
-                          setState(() => _selectedStationPoint = point);
-                        },
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName:
-                              'com.example.system_green_track',
-                        ),
-                        MarkerLayer(markers: markers),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Selected point: ${_selectedStationPoint.latitude.toStringAsFixed(6)}, '
-                  '${_selectedStationPoint.longitude.toStringAsFixed(6)}',
-                  style: GoogleFonts.dmSans(
-                    color: const Color(0xFF4A90D9),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (_stationsLoadError != null) ...[
-            const SizedBox(height: 12),
-            _simpleSectionCard(
-              title: 'Station Table Issue',
-              child: Text(
-                _stationsLoadError!,
-                style: GoogleFonts.dmSans(
-                  color: const Color(0xFFE05454),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          ..._stations.map((station) {
-            final point = _stationPointFromMap(station);
-            return _simpleSectionCard(
-              title: station['name']?.toString() ?? 'Unknown',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Address: ${station['address'] ?? '-'}',
-                    style: GoogleFonts.dmSans(color: Colors.grey.shade700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Phone: ${station['phone'] ?? '-'}',
-                    style: GoogleFonts.dmSans(color: Colors.grey.shade700),
-                  ),
-                  if (point != null) ...[
-                    const SizedBox(height: 8),
-                    _chip(
-                      Icons.pin_drop_rounded,
-                      '${point.latitude.toStringAsFixed(5)}, '
-                      '${point.longitude.toStringAsFixed(5)}',
-                      const Color(0xFFE8F0FA),
-                      const Color(0xFF4A90D9),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _openAddStationSheet(
-                            initialPoint: point ?? _selectedStationPoint,
-                            editingStation: station,
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: _ink,
-                            side: const BorderSide(color: Color(0xFFD4E6D8)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          icon: const Icon(Icons.edit_rounded, size: 16),
-                          label: const Text('Edit'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _confirmDeleteStation(station),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFE05454),
-                            side: const BorderSide(color: Color(0xFFE05454)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          icon: const Icon(Icons.delete_outline_rounded,
-                              size: 16),
-                          label: const Text('Delete'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
+      onAddStation: () => _openAddStationSheet(
+        initialPoint: _selectedStationPoint,
       ),
+      onEditStation: (station) {
+        final point = _stationPointFromMap(station);
+        _openAddStationSheet(
+          initialPoint: point ?? _selectedStationPoint,
+          editingStation: station,
+        );
+      },
+      onDeleteStation: _confirmDeleteStation,
+      onSelectStationPoint: (point) {
+        setState(() => _selectedStationPoint = point);
+      },
+      onPickStation: (station) {
+        _showSnack(
+          'Selected: ${station['name'] ?? 'Station'}',
+          isError: false,
+        );
+      },
+      stationPointFromMap: _stationPointFromMap,
     );
   }
 
