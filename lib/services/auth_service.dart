@@ -1,7 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'supabase_client.dart';
 
 class AuthService {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase = supabaseClient;
 
   /// Sign in with email and password
   Future<AuthResponse> signIn({
@@ -20,21 +21,19 @@ class AuthService {
     required String password,
     required String username,
   }) async {
-    // Step 1: Create auth user
+    // Create auth user in Supabase Auth (password stays in Auth, not profiles).
     final response = await _supabase.auth.signUp(
       email: email,
       password: password,
     );
 
-    // Step 2: Wait a moment for trigger to create the profile row
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // Step 3: Update the profile row with username and password
+    // Ensure a profile row exists/updates in a single idempotent call.
     if (response.user != null) {
-      await _supabase.from('profiles').update({
+      await _supabase.from('profiles').upsert({
+        'id': response.user!.id,
+        'email': email,
         'username': username,
-        'password': password,
-      }).eq('id', response.user!.id);
+      }, onConflict: 'id');
     }
 
     return response;
@@ -47,7 +46,7 @@ class AuthService {
 
     final response = await _supabase
         .from('profiles')
-        .select()
+        .select('id, email, username, created_at, total_points')
         .eq('id', user.id)
         .single();
 

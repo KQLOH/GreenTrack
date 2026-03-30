@@ -1,8 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/supabase_client.dart';
 
-final supabase = Supabase.instance.client;
+final supabase = supabaseClient;
 
 // â”€â”€â”€ Data Model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -163,7 +163,13 @@ class _RecycleScreenState extends State<RecycleScreen>
 
   Future<void> _deleteRecord(String id) async {
     try {
-      await supabase.from('recycle_records').delete().eq('id', id);
+      final user = supabase.auth.currentUser;
+      if (user == null) return;
+      await supabase
+          .from('recycle_records')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', user.id);
       await _loadRecords();
       if (mounted) {
         _showSnack('Record deleted', isError: false);
@@ -1008,7 +1014,7 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
           'station': _selectedStation,
           'points': pts,
           'date': _selectedDate.toIso8601String().substring(0, 10),
-        }).eq('id', widget.editing!.id);
+        }).eq('id', widget.editing!.id).eq('user_id', user.id);
       }
       if (mounted) Navigator.pop(context, true);
     } catch (_) {
