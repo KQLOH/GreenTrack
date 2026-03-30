@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'user/login_screen.dart';
-import 'user/main_navigation_screen.dart';
+import 'User/login_screen.dart';
+import 'User/main_navigation_screen.dart';
+import 'services/supabase_client.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,10 +12,19 @@ Future<void> main() async {
     anonKey: 'sb_publishable_VLbVJYrdW2EF3QW7h5iPXg_B1h6u6tn',
   );
 
+  await _verifySupabaseConnection();
+
   runApp(const MyApp());
 }
 
-final supabase = Supabase.instance.client;
+Future<void> _verifySupabaseConnection() async {
+  try {
+    await supabaseClient.from('profiles').select('id').limit(1);
+    debugPrint('Supabase connected successfully.');
+  } catch (error) {
+    debugPrint('Supabase connectivity check failed: $error');
+  }
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -48,7 +58,7 @@ class _AuthGateState extends State<AuthGate> {
   void initState() {
     super.initState();
     // Listen to auth state changes
-    supabase.auth.onAuthStateChange.listen((data) {
+    supabaseClient.auth.onAuthStateChange.listen((data) {
       if (mounted) {
         setState(() {});
       }
@@ -57,7 +67,7 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
-    final session = supabase.auth.currentSession;
+    final session = supabaseClient.auth.currentSession;
     if (session != null) {
       return const MainNavigationScreen();
     }

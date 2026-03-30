@@ -1,8 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/supabase_client.dart';
 
-final _supabase = Supabase.instance.client;
+final _supabase = supabaseClient;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -31,8 +31,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (user == null) return;
 
       // Load profile
-      final profile =
-          await _supabase.from('profiles').select().eq('id', user.id).single();
+      final profile = await _supabase
+          .from('profiles')
+          .select('id, username, created_at, total_points')
+          .eq('id', user.id)
+          .single();
 
       // Load recycle stats
       final records = await _supabase
