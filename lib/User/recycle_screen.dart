@@ -1,10 +1,9 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:geolocator/geolocator.dart';
 import '../services/supabase_client.dart';
 
 final supabase = supabaseClient;
-
-// â”€â”€â”€ Data Model â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class RecycleRecord {
   final String id;
@@ -15,6 +14,11 @@ class RecycleRecord {
   final int points;
   final DateTime date;
   final DateTime createdAt;
+  final String status;
+  final double? locationLat;
+  final double? locationLng;
+  final DateTime? approvedAt;
+  final String? rejectionReason;
 
   RecycleRecord({
     required this.id,
@@ -25,23 +29,33 @@ class RecycleRecord {
     required this.points,
     required this.date,
     required this.createdAt,
+    this.status = 'pending',
+    this.locationLat,
+    this.locationLng,
+    this.approvedAt,
+    this.rejectionReason,
   });
 
   factory RecycleRecord.fromMap(Map<String, dynamic> map) {
     return RecycleRecord(
-      id: map['id'],
-      userId: map['user_id'],
-      category: map['category'],
+      id: map['id'].toString(),
+      userId: map['user_id'].toString(),
+      category: map['category'].toString(),
       weightKg: (map['weight_kg'] as num).toDouble(),
-      station: map['station'] ?? '',
-      points: map['points'] ?? 0,
-      date: DateTime.parse(map['date']),
-      createdAt: DateTime.parse(map['created_at']),
+      station: (map['station'] ?? '').toString(),
+      points: (map['points'] ?? 0) as int,
+      date: DateTime.parse(map['date'].toString()),
+      createdAt: DateTime.parse(map['created_at'].toString()),
+      status: (map['status'] ?? 'pending').toString(),
+      locationLat: (map['location_lat'] as num?)?.toDouble(),
+      locationLng: (map['location_lng'] as num?)?.toDouble(),
+      approvedAt: map['approved_at'] != null
+          ? DateTime.parse(map['approved_at'].toString())
+          : null,
+      rejectionReason: map['rejection_reason']?.toString(),
     );
   }
 }
-
-// â”€â”€â”€ Category Config â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class CategoryConfig {
   final String name;
@@ -99,7 +113,34 @@ const recyclingStations = [
   'EcoPoint Bachang',
 ];
 
-// â”€â”€â”€ Main Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const Map<String, Map<String, double>> stationCoordinates = {
+  'EcoPoint Melaka Central': {
+    'lat': 2.2202,
+    'lng': 102.2518,
+  },
+  'EcoPoint Bukit Beruang': {
+    'lat': 2.2448,
+    'lng': 102.2787,
+  },
+  'EcoPoint Ayer Keroh': {
+    'lat': 2.2707,
+    'lng': 102.2876,
+  },
+  'EcoPoint Banda Hilir': {
+    'lat': 2.1896,
+    'lng': 102.2497,
+  },
+  'EcoPoint Cheng': {
+    'lat': 2.2483,
+    'lng': 102.2205,
+  },
+  'EcoPoint Bachang': {
+    'lat': 2.2256,
+    'lng': 102.2329,
+  },
+};
+
+const double allowedDistanceInMeters = 100.0;
 
 class RecycleScreen extends StatefulWidget {
   const RecycleScreen({super.key});
@@ -112,10 +153,13 @@ class _RecycleScreenState extends State<RecycleScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   List<RecycleRecord> _records = [];
+  List<String> _stations = List<String>.from(recyclingStations);
+  Map<String, Map<String, double>> _stationCoordinates =
+      Map<String, Map<String, double>>.from(stationCoordinates);
   bool _isLoading = true;
 
-  // Stats
   double get _totalWeight => _records.fold(0, (sum, r) => sum + r.weightKg);
+
   int get _totalPoints => _records.fold(0, (sum, r) => sum + r.points);
 
   Map<String, double> get _categoryWeights {
@@ -130,7 +174,13 @@ class _RecycleScreenState extends State<RecycleScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging && _tabController.index == 0) {
+        _loadStations();
+      }
+    });
     _loadRecords();
+    _loadStations();
   }
 
   @override
@@ -143,12 +193,19 @@ class _RecycleScreenState extends State<RecycleScreen>
     setState(() => _isLoading = true);
     try {
       final user = supabase.auth.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+        return;
+      }
+
       final data = await supabase
           .from('recycle_records')
           .select()
           .eq('user_id', user.id)
           .order('date', ascending: false);
+
       if (mounted) {
         setState(() {
           _records =
@@ -156,8 +213,67 @@ class _RecycleScreenState extends State<RecycleScreen>
           _isLoading = false;
         });
       }
-    } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showSnack('Failed to load records.', isError: true);
+      }
+    }
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  Future<void> _loadStations() async {
+    try {
+      final data = await supabase
+          .from('recycling_stations')
+          .select()
+          .order('name', ascending: true);
+
+      final rows = List<Map<String, dynamic>>.from(data as List);
+      final names = <String>[];
+      final coords = <String, Map<String, double>>{};
+
+      for (final row in rows) {
+        final name = (row['name'] ?? '').toString().trim();
+        if (name.isEmpty) continue;
+
+        final lat = _toDouble(row['latitude']) ??
+            _toDouble(row['location_lat']) ??
+            _toDouble(row['lat']);
+        final lng = _toDouble(row['longitude']) ??
+            _toDouble(row['location_lng']) ??
+            _toDouble(row['lng']);
+
+        names.add(name);
+        if (lat != null && lng != null) {
+          coords[name] = {'lat': lat, 'lng': lng};
+        }
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        if (names.isEmpty) {
+          _stations = List<String>.from(recyclingStations);
+          _stationCoordinates =
+              Map<String, Map<String, double>>.from(stationCoordinates);
+        } else {
+          _stations = names;
+          _stationCoordinates = coords;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _stations = List<String>.from(recyclingStations);
+        _stationCoordinates =
+            Map<String, Map<String, double>>.from(stationCoordinates);
+      });
     }
   }
 
@@ -165,16 +281,19 @@ class _RecycleScreenState extends State<RecycleScreen>
     try {
       final user = supabase.auth.currentUser;
       if (user == null) return;
+
       await supabase
           .from('recycle_records')
           .delete()
           .eq('id', id)
           .eq('user_id', user.id);
+
       await _loadRecords();
+
       if (mounted) {
         _showSnack('Record deleted', isError: false);
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         _showSnack('Delete failed. Please try again.', isError: true);
       }
@@ -182,14 +301,19 @@ class _RecycleScreenState extends State<RecycleScreen>
   }
 
   void _showSnack(String msg, {required bool isError}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.dmSans(color: Colors.white)),
-      backgroundColor:
-          isError ? const Color(0xFFE05454) : const Color(0xFF3DAB6A),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.all(16),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          msg,
+          style: GoogleFonts.dmSans(color: Colors.white),
+        ),
+        backgroundColor:
+            isError ? const Color(0xFFE05454) : const Color(0xFF3DAB6A),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   void _openAddSheet({RecycleRecord? editing}) async {
@@ -197,9 +321,16 @@ class _RecycleScreenState extends State<RecycleScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AddRecordSheet(editing: editing),
+      builder: (_) => _AddRecordSheet(
+        editing: editing,
+        stations: _stations,
+      ),
     );
-    if (result == true) await _loadRecords();
+
+    if (result == true) {
+      await _loadRecords();
+      await _loadStations();
+    }
   }
 
   @override
@@ -213,7 +344,10 @@ class _RecycleScreenState extends State<RecycleScreen>
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF3DAB6A)))
+                    child: CircularProgressIndicator(
+                      color: Color(0xFF3DAB6A),
+                    ),
+                  )
                 : TabBarView(
                     controller: _tabController,
                     children: [
@@ -243,24 +377,26 @@ class _RecycleScreenState extends State<RecycleScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top row: back button + app name + points badge + avatar
               Row(
                 children: [
-                  // Back button
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
+                        color: Colors.white.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            width: 1),
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1,
+                        ),
                       ),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white, size: 16),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -268,49 +404,71 @@ class _RecycleScreenState extends State<RecycleScreen>
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
+                      color: Colors.white.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.eco_rounded,
-                        color: Color(0xFF7EEDB0), size: 18),
+                    child: const Icon(
+                      Icons.eco_rounded,
+                      color: Color(0xFF7EEDB0),
+                      size: 18,
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  Text('GreenTrack',
-                      style: GoogleFonts.dmSerifDisplay(
-                          color: Colors.white, fontSize: 18)),
+                  Text(
+                    'GreenTrack',
+                    style: GoogleFonts.dmSerifDisplay(
+                      color: Colors.white,
+                      fontSize: 18,
+                    ),
+                  ),
                   const Spacer(),
-                  // Points badge
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
+                      color: Colors.white.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.2)),
+                        color: Colors.white.withOpacity(0.2),
+                      ),
                     ),
-                    child: Row(children: [
-                      const Icon(Icons.star_rounded,
-                          color: Color(0xFFFFD700), size: 15),
-                      const SizedBox(width: 5),
-                      Text('$_totalPoints pts',
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          color: Color(0xFFFFD700),
+                          size: 15,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '$_totalPoints pts',
                           style: GoogleFonts.dmSans(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12)),
-                    ]),
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              // Title + subtitle
-              Text('Recycle',
-                  style: GoogleFonts.dmSerifDisplay(
-                      color: Colors.white, fontSize: 26)),
+              Text(
+                'Recycle',
+                style: GoogleFonts.dmSerifDisplay(
+                  color: Colors.white,
+                  fontSize: 26,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text('Track your recycling records',
-                  style:
-                      GoogleFonts.dmSans(color: Colors.white60, fontSize: 12)),
+              Text(
+                'Track your recycling records',
+                style: GoogleFonts.dmSans(
+                  color: Colors.white60,
+                  fontSize: 12,
+                ),
+              ),
             ],
           ),
         ),
@@ -326,7 +484,7 @@ class _RecycleScreenState extends State<RecycleScreen>
         indicatorColor: const Color(0xFF7EEDB0),
         indicatorWeight: 2.5,
         labelColor: const Color(0xFF7EEDB0),
-        unselectedLabelColor: Colors.white.withValues(alpha: 0.5),
+        unselectedLabelColor: Colors.white.withOpacity(0.5),
         labelStyle:
             GoogleFonts.dmSans(fontSize: 13, fontWeight: FontWeight.w600),
         unselectedLabelStyle: GoogleFonts.dmSans(fontSize: 13),
@@ -338,16 +496,16 @@ class _RecycleScreenState extends State<RecycleScreen>
     );
   }
 
-  // â”€â”€ Tab 1: Add Record (inline form) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
   Widget _buildAddTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
-      child: _InlineAddForm(onSuccess: _loadRecords),
+      child: _InlineAddForm(
+        onSuccess: _loadRecords,
+        stations: _stations,
+        stationCoordinates: _stationCoordinates,
+      ),
     );
   }
-
-  // â”€â”€ Tab 2: History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildHistoryTab() {
     if (_records.isEmpty) {
@@ -358,13 +516,21 @@ class _RecycleScreenState extends State<RecycleScreen>
             Icon(Icons.recycling_rounded,
                 size: 60, color: Colors.grey.shade300),
             const SizedBox(height: 16),
-            Text('No records yet',
-                style: GoogleFonts.dmSans(
-                    color: Colors.grey.shade400, fontSize: 16)),
+            Text(
+              'No records yet',
+              style: GoogleFonts.dmSans(
+                color: Colors.grey.shade400,
+                fontSize: 16,
+              ),
+            ),
             const SizedBox(height: 8),
-            Text('Go to the ADD page to submit your first record!',
-                style: GoogleFonts.dmSans(
-                    color: Colors.grey.shade400, fontSize: 13)),
+            Text(
+              'Go to the ADD page to submit your first record!',
+              style: GoogleFonts.dmSans(
+                color: Colors.grey.shade400,
+                fontSize: 13,
+              ),
+            ),
           ],
         ),
       );
@@ -376,22 +542,26 @@ class _RecycleScreenState extends State<RecycleScreen>
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // Category breakdown
           if (_categoryWeights.isNotEmpty) ...[
             _buildCategoryBreakdown(),
             const SizedBox(height: 20),
           ],
-          Text('Record History',
-              style: GoogleFonts.dmSans(
-                  color: const Color(0xFF1A4731),
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700)),
+          Text(
+            'Record History',
+            style: GoogleFonts.dmSans(
+              color: const Color(0xFF1A4731),
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 12),
-          ..._records.map((r) => _RecordCard(
-                record: r,
-                onEdit: () => _openAddSheet(editing: r),
-                onDelete: () => _showDeleteDialog(r.id),
-              )),
+          ..._records.map(
+            (r) => _RecordCard(
+              record: r,
+              onEdit: () => _openAddSheet(editing: r),
+              onDelete: () => _showDeleteDialog(r.id),
+            ),
+          ),
         ],
       ),
     );
@@ -405,49 +575,63 @@ class _RecycleScreenState extends State<RecycleScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4))
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('By Category',
-              style: GoogleFonts.dmSans(
-                  color: const Color(0xFF1A4731),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700)),
+          Text(
+            'By Category',
+            style: GoogleFonts.dmSans(
+              color: const Color(0xFF1A4731),
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 12),
           ..._categoryWeights.entries.map((e) {
             final cfg = categories[e.key]!;
             final pct = _totalWeight > 0 ? e.value / _totalWeight : 0.0;
+
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Column(
                 children: [
-                  Row(children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
+                  Row(
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
                           color: cfg.bgColor,
-                          borderRadius: BorderRadius.circular(8)),
-                      child: Icon(cfg.icon, color: cfg.color, size: 14),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(cfg.name,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(cfg.icon, color: cfg.color, size: 14),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        cfg.name,
                         style: GoogleFonts.dmSans(
-                            color: const Color(0xFF333333),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500)),
-                    const Spacer(),
-                    Text('${e.value.toStringAsFixed(1)} kg',
+                          color: const Color(0xFF333333),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${e.value.toStringAsFixed(1)} kg',
                         style: GoogleFonts.dmSans(
-                            color: cfg.color,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600)),
-                  ]),
+                          color: cfg.color,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 6),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
@@ -473,16 +657,24 @@ class _RecycleScreenState extends State<RecycleScreen>
       builder: (_) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text('Delete Record',
-            style: GoogleFonts.dmSans(
-                color: const Color(0xFF1A4731), fontWeight: FontWeight.w700)),
-        content: Text('Are you sure you want to delete this recycling record?',
-            style: GoogleFonts.dmSans(color: Colors.grey.shade600)),
+        title: Text(
+          'Delete Record',
+          style: GoogleFonts.dmSans(
+            color: const Color(0xFF1A4731),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to delete this recycling record?',
+          style: GoogleFonts.dmSans(color: Colors.grey.shade600),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel',
-                style: GoogleFonts.dmSans(color: Colors.grey.shade500)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.dmSans(color: Colors.grey.shade500),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -492,12 +684,17 @@ class _RecycleScreenState extends State<RecycleScreen>
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFE05454),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
               elevation: 0,
             ),
-            child: Text('Delete',
-                style: GoogleFonts.dmSans(
-                    color: Colors.white, fontWeight: FontWeight.w600)),
+            child: Text(
+              'Delete',
+              style: GoogleFonts.dmSans(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -505,11 +702,16 @@ class _RecycleScreenState extends State<RecycleScreen>
   }
 }
 
-// â”€â”€â”€ Inline Add Form (Tab 1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 class _InlineAddForm extends StatefulWidget {
   final Future<void> Function() onSuccess;
-  const _InlineAddForm({required this.onSuccess});
+  final List<String> stations;
+  final Map<String, Map<String, double>> stationCoordinates;
+
+  const _InlineAddForm({
+    required this.onSuccess,
+    required this.stations,
+    required this.stationCoordinates,
+  });
 
   @override
   State<_InlineAddForm> createState() => _InlineAddFormState();
@@ -517,14 +719,54 @@ class _InlineAddForm extends StatefulWidget {
 
 class _InlineAddFormState extends State<_InlineAddForm> {
   final _weightController = TextEditingController();
+
   String _selectedCategory = 'Plastic';
-  String _selectedStation = recyclingStations.first;
+  String _selectedStation = '';
   DateTime _selectedDate = DateTime.now();
+
   bool _isLoading = false;
+  bool _isCheckingLocation = false;
+  bool _isLocationValid = false;
+
+  double? _currentLat;
+  double? _currentLng;
+
+  String _locationStatus = 'Checking location...';
 
   int get _calculatedPoints => ((double.tryParse(_weightController.text) ?? 0) *
           (categories[_selectedCategory]?.pointsPerKg ?? 10))
       .round();
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedStation = widget.stations.isNotEmpty ? widget.stations.first : '';
+    _checkLocation();
+  }
+
+  @override
+  void didUpdateWidget(covariant _InlineAddForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.stations.isEmpty) {
+      if (_selectedStation.isNotEmpty) {
+        setState(() {
+          _selectedStation = '';
+          _isLocationValid = false;
+          _locationStatus = 'No station available';
+        });
+      }
+      return;
+    }
+
+    if (!widget.stations.contains(_selectedStation)) {
+      setState(() {
+        _selectedStation = widget.stations.first;
+      });
+      if (_currentLat != null && _currentLng != null) {
+        _validateAgainstSelectedStation();
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -532,33 +774,152 @@ class _InlineAddFormState extends State<_InlineAddForm> {
     super.dispose();
   }
 
+  Future<void> _checkLocation() async {
+    setState(() {
+      _isCheckingLocation = true;
+      _locationStatus = 'Checking location...';
+    });
+
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        setState(() {
+          _isLocationValid = false;
+          _locationStatus = 'Location service is disabled';
+          _isCheckingLocation = false;
+        });
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied) {
+        setState(() {
+          _isLocationValid = false;
+          _locationStatus = 'Location permission denied';
+          _isCheckingLocation = false;
+        });
+        return;
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _isLocationValid = false;
+          _locationStatus = 'Location permission denied forever';
+          _isCheckingLocation = false;
+        });
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      _currentLat = position.latitude;
+      _currentLng = position.longitude;
+
+      _validateAgainstSelectedStation();
+    } catch (_) {
+      setState(() {
+        _isLocationValid = false;
+        _locationStatus = 'Failed to get current location';
+        _isCheckingLocation = false;
+      });
+    }
+  }
+
+  void _validateAgainstSelectedStation() {
+    final station = widget.stationCoordinates[_selectedStation];
+
+    if (station == null || _currentLat == null || _currentLng == null) {
+      setState(() {
+        _isLocationValid = false;
+        _locationStatus = 'Station location not available';
+        _isCheckingLocation = false;
+      });
+      return;
+    }
+
+    final distance = Geolocator.distanceBetween(
+      _currentLat!,
+      _currentLng!,
+      station['lat']!,
+      station['lng']!,
+    );
+
+    setState(() {
+      _isLocationValid = distance <= allowedDistanceInMeters;
+      _locationStatus = _isLocationValid
+          ? 'Location verified (${distance.toStringAsFixed(0)}m from station)'
+          : 'You are too far from $_selectedStation (${distance.toStringAsFixed(0)}m)';
+      _isCheckingLocation = false;
+    });
+  }
+
   Future<void> _submit() async {
+    if (_selectedStation.isEmpty) {
+      _showSnack('No station available yet. Please try again shortly.',
+          isError: true);
+      return;
+    }
+
+    if (!_isLocationValid) {
+      _showSnack(
+        'You must be near the selected recycling station to submit',
+        isError: true,
+      );
+      return;
+    }
+
     final weight = double.tryParse(_weightController.text.trim());
     if (weight == null || weight <= 0) {
       _showSnack('Please enter a valid weight', isError: true);
       return;
     }
+
     setState(() => _isLoading = true);
+
     try {
       final user = supabase.auth.currentUser;
-      if (user == null) return;
-      final pts =
-          (weight * (categories[_selectedCategory]!.pointsPerKg)).round();
+      if (user == null) {
+        _showSnack('User not logged in', isError: true);
+        return;
+      }
+
       await supabase.from('recycle_records').insert({
         'user_id': user.id,
         'category': _selectedCategory,
         'weight_kg': weight,
         'station': _selectedStation,
-        'points': pts,
+        'points': 0,
+        'status': 'pending',
+        'location_lat': _currentLat,
+        'location_lng': _currentLng,
         'date': _selectedDate.toIso8601String().substring(0, 10),
       });
+
       _weightController.clear();
-      setState(() => _selectedCategory = 'Plastic');
+      setState(() {
+        _selectedCategory = 'Plastic';
+        _selectedStation =
+            widget.stations.isNotEmpty ? widget.stations.first : '';
+        _selectedDate = DateTime.now();
+      });
+
       await widget.onSuccess();
+
       if (mounted) {
-        _showSnack('Record submitted! You earned $pts points!', isError: false);
+        _showSnack(
+          'Record submitted for review! Pending admin approval.',
+          isError: false,
+        );
+        _checkLocation();
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         _showSnack('Submission failed. Please try again.', isError: true);
       }
@@ -570,14 +931,19 @@ class _InlineAddFormState extends State<_InlineAddForm> {
   }
 
   void _showSnack(String msg, {required bool isError}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.dmSans(color: Colors.white)),
-      backgroundColor:
-          isError ? const Color(0xFFE05454) : const Color(0xFF3DAB6A),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.all(16),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          msg,
+          style: GoogleFonts.dmSans(color: Colors.white),
+        ),
+        backgroundColor:
+            isError ? const Color(0xFFE05454) : const Color(0xFF3DAB6A),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   @override
@@ -589,42 +955,49 @@ class _InlineAddFormState extends State<_InlineAddForm> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 16,
-              offset: const Offset(0, 4))
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                    colors: [Color(0xFF4CD787), Color(0xFF2D7A4F)]),
-                borderRadius: BorderRadius.circular(10),
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF4CD787), Color(0xFF2D7A4F)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.add, color: Colors.white, size: 18),
               ),
-              child: const Icon(Icons.add, color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 10),
-            Text('Add New Record',
+              const SizedBox(width: 10),
+              Text(
+                'Add New Record',
                 style: GoogleFonts.dmSans(
-                    color: const Color(0xFF1A4731),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700)),
-          ]),
-
+                  color: const Color(0xFF1A4731),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
-
-          // Category
-          Text('CATEGORY',
-              style: GoogleFonts.dmSans(
-                  color: const Color(0xFF888888),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8)),
+          Text(
+            'CATEGORY',
+            style: GoogleFonts.dmSans(
+              color: const Color(0xFF888888),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+            ),
+          ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 10,
@@ -632,6 +1005,7 @@ class _InlineAddFormState extends State<_InlineAddForm> {
             children: categories.keys.map((cat) {
               final cfg = categories[cat]!;
               final selected = _selectedCategory == cat;
+
               return GestureDetector(
                 onTap: () => setState(() => _selectedCategory = cat),
                 child: AnimatedContainer(
@@ -646,39 +1020,49 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                       width: 1.5,
                     ),
                   ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(cfg.icon,
-                        color: selected ? Colors.white : cfg.color, size: 16),
-                    const SizedBox(width: 6),
-                    Text(cat,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        cfg.icon,
+                        color: selected ? Colors.white : cfg.color,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        cat,
                         style: GoogleFonts.dmSans(
-                            color: selected ? Colors.white : cfg.color,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13)),
-                  ]),
+                          color: selected ? Colors.white : cfg.color,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }).toList(),
           ),
-
           const SizedBox(height: 20),
-
-          // Weight
-          Text('WEIGHT (KG)',
-              style: GoogleFonts.dmSans(
-                  color: const Color(0xFF888888),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8)),
+          Text(
+            'WEIGHT (KG)',
+            style: GoogleFonts.dmSans(
+              color: const Color(0xFF888888),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+            ),
+          ),
           const SizedBox(height: 8),
           TextField(
             controller: _weightController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             onChanged: (_) => setState(() {}),
             style: GoogleFonts.dmSans(
-                color: const Color(0xFF1A4731),
-                fontSize: 15,
-                fontWeight: FontWeight.w500),
+              color: const Color(0xFF1A4731),
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
             decoration: InputDecoration(
               hintText: '0.0',
               hintStyle: GoogleFonts.dmSans(color: Colors.grey.shade300),
@@ -704,16 +1088,16 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                   GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 14),
             ),
           ),
-
           const SizedBox(height: 20),
-
-          // Station
-          Text('RECYCLING STATION',
-              style: GoogleFonts.dmSans(
-                  color: const Color(0xFF888888),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8)),
+          Text(
+            'RECYCLING STATION',
+            style: GoogleFonts.dmSans(
+              color: const Color(0xFF888888),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+            ),
+          ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -724,31 +1108,51 @@ class _InlineAddFormState extends State<_InlineAddForm> {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                value: _selectedStation,
+                value: widget.stations.contains(_selectedStation)
+                    ? _selectedStation
+                    : null,
                 isExpanded: true,
                 style: GoogleFonts.dmSans(
-                    color: const Color(0xFF1A4731),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500),
+                  color: const Color(0xFF1A4731),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                hint: Text(
+                  'No station available',
+                  style: GoogleFonts.dmSans(
+                    color: Colors.grey.shade500,
+                    fontSize: 13,
+                  ),
+                ),
                 dropdownColor: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                items: recyclingStations
+                items: widget.stations
                     .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
-                onChanged: (v) => setState(() => _selectedStation = v!),
+                onChanged: widget.stations.isEmpty
+                    ? null
+                    : (v) {
+                        if (v == null) return;
+                        setState(() => _selectedStation = v);
+                        if (_currentLat != null && _currentLng != null) {
+                          _validateAgainstSelectedStation();
+                        } else {
+                          _checkLocation();
+                        }
+                      },
               ),
             ),
           ),
-
           const SizedBox(height: 20),
-
-          // Date picker
-          Text('DATE',
-              style: GoogleFonts.dmSans(
-                  color: const Color(0xFF888888),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8)),
+          Text(
+            'DATE',
+            style: GoogleFonts.dmSans(
+              color: const Color(0xFF888888),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+            ),
+          ),
           const SizedBox(height: 8),
           GestureDetector(
             onTap: () async {
@@ -767,7 +1171,10 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                   child: child!,
                 ),
               );
-              if (picked != null) setState(() => _selectedDate = picked);
+
+              if (picked != null) {
+                setState(() => _selectedDate = picked);
+              }
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -776,24 +1183,84 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.grey.shade200, width: 1.5),
               ),
-              child: Row(children: [
-                Icon(Icons.calendar_today_outlined,
-                    color: Colors.grey.shade400, size: 18),
-                const SizedBox(width: 10),
-                Text(
-                  '${_selectedDate.year}-'
-                  '${_selectedDate.month.toString().padLeft(2, '0')}-'
-                  '${_selectedDate.day.toString().padLeft(2, '0')}',
-                  style: GoogleFonts.dmSans(
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    color: Colors.grey.shade400,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}',
+                    style: GoogleFonts.dmSans(
                       color: const Color(0xFF1A4731),
                       fontSize: 14,
-                      fontWeight: FontWeight.w500),
-                ),
-              ]),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-
-          // Points preview
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: _isLocationValid
+                  ? const Color(0xFFE8F5EE)
+                  : const Color(0xFFFFF0F0),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _isLocationValid
+                    ? const Color(0xFFB8E8CC)
+                    : const Color(0xFFF3C2C2),
+              ),
+            ),
+            child: Row(
+              children: [
+                if (_isCheckingLocation)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  Icon(
+                    _isLocationValid
+                        ? Icons.check_circle_rounded
+                        : Icons.location_off_rounded,
+                    size: 18,
+                    color: _isLocationValid
+                        ? const Color(0xFF3DAB6A)
+                        : const Color(0xFFE05454),
+                  ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _locationStatus,
+                    style: GoogleFonts.dmSans(
+                      color: _isLocationValid
+                          ? const Color(0xFF2D7A4F)
+                          : const Color(0xFFE05454),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _isCheckingLocation ? null : _checkLocation,
+                  child: Text(
+                    'Refresh',
+                    style: GoogleFonts.dmSans(
+                      color: const Color(0xFF2D7A4F),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
           if (_weightController.text.isNotEmpty &&
               double.tryParse(_weightController.text) != null) ...[
             const SizedBox(height: 20),
@@ -802,43 +1269,62 @@ class _InlineAddFormState extends State<_InlineAddForm> {
               decoration: BoxDecoration(
                 color: const Color(0xFFF0FAF4),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFB8E8CC), width: 1.5),
-              ),
-              child: Row(children: [
-                const Icon(Icons.star_rounded,
-                    color: Color(0xFFFFB800), size: 20),
-                const SizedBox(width: 8),
-                Text('You will earn ',
-                    style: GoogleFonts.dmSans(
-                        color: Colors.grey.shade600, fontSize: 13)),
-                Text('$_calculatedPoints points',
-                    style: GoogleFonts.dmSans(
-                        color: const Color(0xFF2D7A4F),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700)),
-                const Spacer(),
-                Text(
-                  '${categories[_selectedCategory]!.pointsPerKg} pts/kg',
-                  style: GoogleFonts.dmSans(
-                      color: Colors.grey.shade400, fontSize: 12),
+                border: Border.all(
+                  color: const Color(0xFFB8E8CC),
+                  width: 1.5,
                 ),
-              ]),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.star_rounded,
+                    color: Color(0xFFFFB800),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Potential reward: ',
+                    style: GoogleFonts.dmSans(
+                      color: Colors.grey.shade600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    '$_calculatedPoints points',
+                    style: GoogleFonts.dmSans(
+                      color: const Color(0xFF2D7A4F),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${categories[_selectedCategory]!.pointsPerKg} pts/kg',
+                    style: GoogleFonts.dmSans(
+                      color: Colors.grey.shade400,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-
           const SizedBox(height: 24),
-
           SizedBox(
             width: double.infinity,
             height: 52,
             child: ElevatedButton(
-              onPressed: _isLoading ? null : _submit,
+              onPressed:
+                  (_isLoading || _isCheckingLocation || !_isLocationValid)
+                      ? null
+                      : _submit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2D7A4F),
                 disabledBackgroundColor:
-                    const Color(0xFF2D7A4F).withValues(alpha: 0.5),
+                    const Color(0xFF2D7A4F).withOpacity(0.5),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 elevation: 0,
               ),
               child: _isLoading
@@ -846,12 +1332,18 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2.5))
-                  : Text('Submit Record',
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : Text(
+                      _isLocationValid ? 'Submit Record' : 'Not near a station',
                       style: GoogleFonts.dmSans(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600)),
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -859,8 +1351,6 @@ class _InlineAddFormState extends State<_InlineAddForm> {
     );
   }
 }
-
-// â”€â”€â”€ Record Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _RecordCard extends StatelessWidget {
   final RecycleRecord record;
@@ -873,11 +1363,38 @@ class _RecordCard extends StatelessWidget {
     required this.onDelete,
   });
 
+  Map<String, dynamic> _getStatusInfo() {
+    switch (record.status.toLowerCase()) {
+      case 'approved':
+        return {
+          'label': 'Approved',
+          'color': const Color(0xFF3DAB6A),
+          'bgColor': const Color(0xFFE8F5EE),
+          'icon': Icons.check_circle_rounded,
+        };
+      case 'rejected':
+        return {
+          'label': 'Rejected',
+          'color': const Color(0xFFE05454),
+          'bgColor': const Color(0xFFFFF0F0),
+          'icon': Icons.cancel_rounded,
+        };
+      default:
+        return {
+          'label': 'Pending',
+          'color': const Color(0xFF4A90D9),
+          'bgColor': const Color(0xFFE8F0FA),
+          'icon': Icons.schedule_rounded,
+        };
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cfg = categories[record.category] ?? categories['Plastic']!;
     final dateStr =
         '${record.date.year}-${record.date.month.toString().padLeft(2, '0')}-${record.date.day.toString().padLeft(2, '0')}';
+    final statusInfo = _getStatusInfo();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -887,89 +1404,178 @@ class _RecordCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 3))
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
-      child: Row(children: [
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-              color: cfg.bgColor, borderRadius: BorderRadius.circular(14)),
-          child: Icon(cfg.icon, color: cfg.color, size: 22),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: cfg.bgColor,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(cfg.icon, color: cfg.color, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      record.category,
+                      style: GoogleFonts.dmSans(
+                        color: const Color(0xFF1A4731),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusInfo['bgColor'] as Color,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            statusInfo['icon'] as IconData,
+                            color: statusInfo['color'] as Color,
+                            size: 11,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            statusInfo['label'] as String,
+                            style: GoogleFonts.dmSans(
+                              color: statusInfo['color'] as Color,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$dateStr  ·  ${record.station}',
+                  style: GoogleFonts.dmSans(
+                    color: Colors.grey.shade500,
+                    fontSize: 11,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (record.rejectionReason != null &&
+                    record.rejectionReason!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Reason: ${record.rejectionReason}',
+                    style: GoogleFonts.dmSans(
+                      color: const Color(0xFFE05454),
+                      fontSize: 11,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(record.category,
-                  style: GoogleFonts.dmSans(
-                      color: const Color(0xFF1A4731),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600)),
+              Text(
+                '${record.weightKg.toStringAsFixed(1)} kg',
+                style: GoogleFonts.dmSans(
+                  color: cfg.color,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text('$dateStr  Â·  ${record.station}',
-                  style: GoogleFonts.dmSans(
-                      color: Colors.grey.shade500, fontSize: 11),
-                  overflow: TextOverflow.ellipsis),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.star_rounded,
+                    color: Color(0xFFFFB800),
+                    size: 12,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    '${record.points} pts',
+                    style: GoogleFonts.dmSans(
+                      color: Colors.grey.shade400,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-        ),
-        const SizedBox(width: 8),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text('${record.weightKg.toStringAsFixed(1)} kg',
-              style: GoogleFonts.dmSans(
-                  color: cfg.color, fontSize: 14, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 2),
-          Row(children: [
-            const Icon(Icons.star_rounded, color: Color(0xFFFFB800), size: 12),
-            const SizedBox(width: 2),
-            Text('${record.points} pts',
-                style: GoogleFonts.dmSans(
-                    color: Colors.grey.shade400, fontSize: 11)),
-          ]),
-        ]),
-        const SizedBox(width: 10),
-        Column(children: [
-          GestureDetector(
-            onTap: onEdit,
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                  color: const Color(0xFFF0FAF4),
-                  borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.edit_outlined,
-                  color: Color(0xFF3DAB6A), size: 15),
-            ),
+          const SizedBox(width: 10),
+          Column(
+            children: [
+              GestureDetector(
+                onTap: onEdit,
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FAF4),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.edit_outlined,
+                    color: Color(0xFF3DAB6A),
+                    size: 15,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              GestureDetector(
+                onTap: onDelete,
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF0F0),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.delete_outline,
+                    color: Color(0xFFE05454),
+                    size: 15,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
-          GestureDetector(
-            onTap: onDelete,
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                  color: const Color(0xFFFFF0F0),
-                  borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.delete_outline,
-                  color: Color(0xFFE05454), size: 15),
-            ),
-          ),
-        ]),
-      ]),
+        ],
+      ),
     );
   }
 }
 
-// â”€â”€â”€ Edit Sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 class _AddRecordSheet extends StatefulWidget {
   final RecycleRecord? editing;
-  const _AddRecordSheet({this.editing});
+  final List<String> stations;
+
+  const _AddRecordSheet({
+    this.editing,
+    required this.stations,
+  });
 
   @override
   State<_AddRecordSheet> createState() => _AddRecordSheetState();
@@ -980,6 +1586,7 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
   late String _selectedCategory;
   late String _selectedStation;
   late DateTime _selectedDate;
+
   bool _isLoading = false;
 
   @override
@@ -989,7 +1596,8 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
     _weightController =
         TextEditingController(text: e != null ? e.weightKg.toString() : '');
     _selectedCategory = e?.category ?? 'Plastic';
-    _selectedStation = e?.station ?? recyclingStations.first;
+    _selectedStation =
+        e?.station ?? (widget.stations.isNotEmpty ? widget.stations.first : '');
     _selectedDate = e?.date ?? DateTime.now();
   }
 
@@ -1000,23 +1608,35 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
   }
 
   Future<void> _save() async {
+    if (_selectedStation.isEmpty) return;
+
     final weight = double.tryParse(_weightController.text.trim());
     if (weight == null || weight <= 0) return;
+
     setState(() => _isLoading = true);
+
     try {
       final user = supabase.auth.currentUser;
       if (user == null) return;
-      final pts = (weight * categories[_selectedCategory]!.pointsPerKg).round();
+
       if (widget.editing != null) {
-        await supabase.from('recycle_records').update({
-          'category': _selectedCategory,
-          'weight_kg': weight,
-          'station': _selectedStation,
-          'points': pts,
-          'date': _selectedDate.toIso8601String().substring(0, 10),
-        }).eq('id', widget.editing!.id).eq('user_id', user.id);
+        await supabase
+            .from('recycle_records')
+            .update({
+              'category': _selectedCategory,
+              'weight_kg': weight,
+              'station': _selectedStation,
+              'points': 0,
+              'status': 'pending',
+              'approved_at': null,
+              'rejection_reason': null,
+              'date': _selectedDate.toIso8601String().substring(0, 10),
+            })
+            .eq('id', widget.editing!.id)
+            .eq('user_id', user.id);
+
+        if (mounted) Navigator.pop(context, true);
       }
-      if (mounted) Navigator.pop(context, true);
     } catch (_) {
       if (mounted) Navigator.pop(context, false);
     } finally {
@@ -1028,7 +1648,11 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.fromLTRB(
-          24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+        24,
+        16,
+        24,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -1042,24 +1666,28 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(2)),
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
           const SizedBox(height: 20),
-          Text('Edit Record',
-              style: GoogleFonts.dmSans(
-                  color: const Color(0xFF1A4731),
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700)),
+          Text(
+            'Edit Record',
+            style: GoogleFonts.dmSans(
+              color: const Color(0xFF1A4731),
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 20),
-          // Category
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: categories.keys.map((cat) {
               final cfg = categories[cat]!;
               final selected = _selectedCategory == cat;
+
               return GestureDetector(
                 onTap: () => setState(() => _selectedCategory = cat),
                 child: Container(
@@ -1069,22 +1697,30 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
                     color: selected ? cfg.color : cfg.bgColor,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(cfg.icon,
-                        color: selected ? Colors.white : cfg.color, size: 14),
-                    const SizedBox(width: 5),
-                    Text(cat,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        cfg.icon,
+                        color: selected ? Colors.white : cfg.color,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        cat,
                         style: GoogleFonts.dmSans(
-                            color: selected ? Colors.white : cfg.color,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600)),
-                  ]),
+                          color: selected ? Colors.white : cfg.color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }).toList(),
           ),
           const SizedBox(height: 16),
-          // Weight
           TextField(
             controller: _weightController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -1095,8 +1731,9 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
               filled: true,
               fillColor: const Color(0xFFF7F9F8),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none),
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
@@ -1105,7 +1742,6 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          // Station dropdown
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
@@ -1115,15 +1751,32 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                value: _selectedStation,
+                value: widget.stations.contains(_selectedStation)
+                    ? _selectedStation
+                    : null,
                 isExpanded: true,
                 style: GoogleFonts.dmSans(
-                    color: const Color(0xFF1A4731), fontSize: 14),
+                  color: const Color(0xFF1A4731),
+                  fontSize: 14,
+                ),
                 dropdownColor: Colors.white,
-                items: recyclingStations
+                hint: Text(
+                  'No station available',
+                  style: GoogleFonts.dmSans(
+                    color: Colors.grey.shade500,
+                    fontSize: 13,
+                  ),
+                ),
+                items: widget.stations
                     .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
-                onChanged: (v) => setState(() => _selectedStation = v!),
+                onChanged: widget.stations.isEmpty
+                    ? null
+                    : (v) {
+                        if (v != null) {
+                          setState(() => _selectedStation = v);
+                        }
+                      },
               ),
             ),
           ),
@@ -1136,7 +1789,8 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2D7A4F),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 elevation: 0,
               ),
               child: _isLoading
@@ -1144,10 +1798,17 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2.5))
-                  : Text('Save Changes',
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : Text(
+                      'Save Changes',
                       style: GoogleFonts.dmSans(
-                          color: Colors.white, fontWeight: FontWeight.w600)),
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
           ),
         ],
