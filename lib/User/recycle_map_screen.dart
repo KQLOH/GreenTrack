@@ -5,6 +5,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/supabase_client.dart';
+
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // No API key needed, uses OpenStreetMap (completely free).
 // Mock data for Melaka, replace with real data later.
@@ -198,9 +200,11 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
   final MapController _mapController = MapController();
   LatLng? _currentPosition;
   List<RecyclingCenter> _centers = [];
+  List<RecyclingCenter> _allCenters = [];
   RecyclingCenter? _selectedCenter;
 
   bool _isLoading = true;
+  bool _usingMockData = false;
   int _radiusKm = 5;
 
   late AnimationController _sheetAnim;
@@ -239,18 +243,18 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
         setState(() {
           _currentPosition = _melakaCenter;
         });
-        _loadCenters();
+        await _loadCenters();
         return;
       }
       final pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
       setState(() => _currentPosition = LatLng(pos.latitude, pos.longitude));
       _mapController.move(_currentPosition!, 13.5);
-      _loadCenters();
+      await _loadCenters();
     } catch (_) {
       // Fallback to Melaka center if location fails
       setState(() => _currentPosition = _melakaCenter);
-      _loadCenters();
+      await _loadCenters();
     }
   }
 
@@ -266,23 +270,77 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
 
   // â”€â”€ Load & Filter Centers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  void _loadCenters() {
+  double? _toDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  Future<List<RecyclingCenter>> _fetchCentersFromDb() async {
+    final data = await supabaseClient
+        .from('recycling_stations')
+        .select()
+        .order('created_at', ascending: false);
+
+    final rows = List<Map<String, dynamic>>.from(data as List);
+    final result = <RecyclingCenter>[];
+
+    for (final row in rows) {
+      final lat = _toDouble(row['latitude']) ??
+          _toDouble(row['location_lat']) ??
+          _toDouble(row['lat']);
+      final lng = _toDouble(row['longitude']) ??
+          _toDouble(row['location_lng']) ??
+          _toDouble(row['lng']);
+
+      if (lat == null || lng == null) continue;
+
+      final name = (row['name'] ?? '').toString().trim();
+      if (name.isEmpty) continue;
+
+      result.add(
+        RecyclingCenter(
+          id: (row['id'] ?? name).toString(),
+          name: name,
+          address: (row['address'] ?? '').toString(),
+          location: LatLng(lat, lng),
+          phoneNumber: row['phone']?.toString(),
+          isOpen: row['is_open'] == null ? true : row['is_open'] == true,
+        ),
+      );
+    }
+
+    return result;
+  }
+
+  Future<void> _loadCenters() async {
     final origin = _currentPosition ?? _melakaCenter;
 
-    // Calculate distance for each center and filter by radius
-    final filtered = _mockCenters
-        .map((c) {
-          c.distanceKm = Geolocator.distanceBetween(origin.latitude,
-                  origin.longitude, c.location.latitude, c.location.longitude) /
-              1000;
-          return c;
-        })
-        .where((c) => c.distanceKm <= _radiusKm)
-        .toList()
+    try {
+      final dbCenters = await _fetchCentersFromDb();
+      _allCenters = dbCenters.isEmpty
+          ? List<RecyclingCenter>.from(_mockCenters)
+          : dbCenters;
+      _usingMockData = dbCenters.isEmpty;
+    } catch (_) {
+      _allCenters = List<RecyclingCenter>.from(_mockCenters);
+      _usingMockData = true;
+    }
+
+    final withDistance = _allCenters.map((c) {
+      c.distanceKm = Geolocator.distanceBetween(origin.latitude,
+              origin.longitude, c.location.latitude, c.location.longitude) /
+          1000;
+      return c;
+    }).toList()
       ..sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
 
+    final nearby =
+        withDistance.where((c) => c.distanceKm <= _radiusKm).toList();
+    final display = nearby.isEmpty ? withDistance.take(20).toList() : nearby;
+
     setState(() {
-      _centers = filtered;
+      _centers = display;
       _isLoading = false;
       _selectedCenter = null;
     });
@@ -439,8 +497,7 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
         if (_isLoading) _buildLoadingOverlay(),
         if (_selectedCenter != null) _buildDetailSheet(),
         if (!_isLoading) _buildCountBadge(),
-        // Mock data banner
-        _buildMockBanner(),
+        if (_usingMockData) _buildMockBanner(),
       ]),
     );
   }
