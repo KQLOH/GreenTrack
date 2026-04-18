@@ -15,6 +15,7 @@ class AdminStationsTab extends StatelessWidget {
     required this.onAddStation,
     required this.onEditStation,
     required this.onDeleteStation,
+    required this.onToggleStationOpen,
     required this.onSelectStationPoint,
     required this.onPickStation,
     required this.stationPointFromMap,
@@ -32,6 +33,7 @@ class AdminStationsTab extends StatelessWidget {
   final VoidCallback onAddStation;
   final void Function(Map<String, dynamic> station) onEditStation;
   final void Function(Map<String, dynamic> station) onDeleteStation;
+  final Future<void> Function(Map<String, dynamic> station) onToggleStationOpen;
   final void Function(LatLng point) onSelectStationPoint;
   final void Function(Map<String, dynamic> station) onPickStation;
   final LatLng? Function(Map<String, dynamic> station) stationPointFromMap;
@@ -186,11 +188,35 @@ class AdminStationsTab extends StatelessWidget {
           else
             ...stations.map((station) {
               final point = stationPointFromMap(station);
+              final extras = _additionalStationFields(station);
               return _simpleSectionCard(
                 title: station['name']?.toString() ?? 'Unknown',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _chip(
+                      (station['is_open'] == null
+                              ? true
+                              : station['is_open'] == true)
+                          ? Icons.check_circle_rounded
+                          : Icons.cancel_rounded,
+                      (station['is_open'] == null
+                              ? true
+                              : station['is_open'] == true)
+                          ? 'Open'
+                          : 'Closed',
+                      (station['is_open'] == null
+                              ? true
+                              : station['is_open'] == true)
+                          ? const Color(0xFFE8F5EE)
+                          : const Color(0xFFFFF0F0),
+                      (station['is_open'] == null
+                              ? true
+                              : station['is_open'] == true)
+                          ? const Color(0xFF3DAB6A)
+                          : const Color(0xFFE05454),
+                    ),
+                    const SizedBox(height: 8),
                     Text(
                       'Address: ${station['address'] ?? '-'}',
                       style: GoogleFonts.dmSans(color: Colors.grey.shade700),
@@ -209,6 +235,10 @@ class AdminStationsTab extends StatelessWidget {
                         const Color(0xFFE8F0FA),
                         const Color(0xFF4A90D9),
                       ),
+                    ],
+                    if (extras.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      ...extras,
                     ],
                     const SizedBox(height: 12),
                     Row(
@@ -230,6 +260,36 @@ class AdminStationsTab extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: OutlinedButton.icon(
+                            onPressed: isSavingStation
+                                ? null
+                                : () => onToggleStationOpen(station),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF4A90D9),
+                              side: const BorderSide(color: Color(0xFF4A90D9)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            icon: Icon(
+                              (station['is_open'] == null
+                                      ? true
+                                      : station['is_open'] == true)
+                                  ? Icons.toggle_off_rounded
+                                  : Icons.toggle_on_rounded,
+                              size: 16,
+                            ),
+                            label: Text(
+                              (station['is_open'] == null
+                                      ? true
+                                      : station['is_open'] == true)
+                                  ? 'Close'
+                                  : 'Open',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
                             onPressed: () => onDeleteStation(station),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFFE05454),
@@ -238,8 +298,8 @@ class AdminStationsTab extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            icon:
-                                const Icon(Icons.delete_outline_rounded, size: 16),
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                size: 16),
                             label: const Text('Delete'),
                           ),
                         ),
@@ -252,6 +312,44 @@ class AdminStationsTab extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  List<Widget> _additionalStationFields(Map<String, dynamic> station) {
+    const hiddenKeys = <String>{
+      'id',
+      'name',
+      'address',
+      'phone',
+      'latitude',
+      'longitude',
+      'location_lat',
+      'location_lng',
+      'lat',
+      'lng',
+      'is_open',
+      'created_at',
+      'updated_at',
+    };
+
+    final widgets = <Widget>[];
+    for (final entry in station.entries) {
+      if (hiddenKeys.contains(entry.key)) continue;
+      final value = entry.value;
+      if (value == null) continue;
+      final asText = value.toString().trim();
+      if (asText.isEmpty) continue;
+
+      widgets.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Text(
+            '${entry.key}: $asText',
+            style: GoogleFonts.dmSans(color: Colors.grey.shade700),
+          ),
+        ),
+      );
+    }
+    return widgets;
   }
 
   Widget _sectionHeader({
@@ -357,4 +455,3 @@ class AdminStationsTab extends StatelessWidget {
     );
   }
 }
-

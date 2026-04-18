@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 
 import 'tabs/admin_dashboard_tab.dart';
+import 'tabs/admin_records_tab.dart';
+import 'tabs/admin_rewards_tab.dart';
 import 'tabs/admin_stations_tab.dart';
 import 'tabs/admin_users_tab.dart';
 import '../services/supabase_client.dart';
@@ -32,18 +34,26 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
   bool _isAuthorizing = true;
   bool _isAdmin = false;
   bool _isSavingStation = false;
+  bool _isUpdatingUser = false;
+  bool _isSavingRecord = false;
+  bool _isSavingReward = false;
   String? _stationsLoadError;
+  String? _rewardsLoadError;
   LatLng _selectedStationPoint = _melakaCenter;
+  String _userSearchQuery = '';
+  String _recordSearchQuery = '';
 
   List<Map<String, dynamic>> _users = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _records = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _stations = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _pendingRecords = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _rewards = <Map<String, dynamic>>[];
+  int _totalRedemptions = 0;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging &&
           _currentTabIndex != _tabController.index) {
@@ -109,6 +119,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       _loadRecords(),
       _loadPendingRecords(),
       _loadStations(),
+      _loadRewards(),
     ]);
 
     if (mounted) {
@@ -129,15 +140,87 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     }
   }
 
+  List<Map<String, dynamic>> get _filteredUsers {
+    final query = _userSearchQuery.trim().toLowerCase();
+    if (query.isEmpty) return _users;
+
+    return _users.where((user) {
+      final username = (user['username'] ?? '').toString().toLowerCase();
+      final email = (user['email'] ?? '').toString().toLowerCase();
+      final role = (user['role'] ?? '').toString().toLowerCase();
+      return username.contains(query) ||
+          email.contains(query) ||
+          role.contains(query);
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> get _filteredRecords {
+    final query = _recordSearchQuery.trim().toLowerCase();
+    if (query.isEmpty) return _records;
+
+    return _records.where((record) {
+      final category = (record['category'] ?? '').toString().toLowerCase();
+      final station = (record['station'] ?? '').toString().toLowerCase();
+      final status = (record['status'] ?? '').toString().toLowerCase();
+      final submittedBy = (record['submitted_user'] ??
+              record['user_email'] ??
+              record['user_id'] ??
+              '')
+          .toString()
+          .toLowerCase();
+      return category.contains(query) ||
+          station.contains(query) ||
+          status.contains(query) ||
+          submittedBy.contains(query);
+    }).toList();
+  }
+
   Future<void> _loadRecords() async {
     try {
       final data = await _supabase
           .from('recycle_records')
           .select()
-          .neq('status', 'pending')
           .order('created_at', ascending: false);
 
-      _records = List<Map<String, dynamic>>.from(data as List);
+      final rows = List<Map<String, dynamic>>.from(data as List);
+
+      final userIds = rows
+          .map((row) => row['user_id']?.toString())
+          .whereType<String>()
+          .where((id) => id.isNotEmpty)
+          .toSet()
+          .toList();
+
+      Map<String, Map<String, dynamic>> profilesById =
+          <String, Map<String, dynamic>>{};
+      if (userIds.isNotEmpty) {
+        try {
+          final profileRows = await _supabase
+              .from('profiles')
+              .select('id, username, email')
+              .inFilter('id', userIds);
+          for (final profile
+              in List<Map<String, dynamic>>.from(profileRows as List)) {
+            final id = profile['id']?.toString();
+            if (id != null && id.isNotEmpty) {
+              profilesById[id] = profile;
+            }
+          }
+        } catch (_) {
+          profilesById = <String, Map<String, dynamic>>{};
+        }
+      }
+
+      _records = rows.map((row) {
+        final userId = row['user_id']?.toString();
+        final profile = userId == null ? null : profilesById[userId];
+        return {
+          ...row,
+          'submitted_user':
+              profile?['username'] ?? profile?['email'] ?? row['user_id'],
+          'user_email': profile?['email'],
+        };
+      }).toList();
     } catch (_) {
       _records = <Map<String, dynamic>>[];
     }
@@ -157,6 +240,42 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     }
   }
 
+  Future<void> _loadRewards() async {
+    _rewardsLoadError = null;
+    _totalRedemptions = 0;
+
+    try {
+      final data = await _supabase
+          .from('admin_rewards')
+          .select()
+          .order('created_at', ascending: false);
+
+      _rewards = List<Map<String, dynamic>>.from(data as List);
+    } catch (error) {
+      _rewards = <Map<String, dynamic>>[];
+      _rewardsLoadError =
+          'Rewards table unavailable. Create table "admin_rewards" to manage rewards.';
+      debugPrint('Rewards load error: $error');
+      return;
+    }
+
+    try {
+      final redemptionRows =
+          await _supabase.from('reward_redemptions').select('quantity');
+
+      int total = 0;
+      for (final row
+          in List<Map<String, dynamic>>.from(redemptionRows as List)) {
+        total += (row['quantity'] as num?)?.toInt() ?? 1;
+      }
+      _totalRedemptions = total;
+    } catch (_) {
+      _totalRedemptions = _rewards.fold<int>(0, (sum, reward) {
+        return sum + ((reward['redeemed_count'] as num?)?.toInt() ?? 0);
+      });
+    }
+  }
+
   Future<void> _moderatePendingRecord(
     Map<String, dynamic> record,
     bool approved,
@@ -170,9 +289,50 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     final status = approved ? 'approved' : 'rejected';
 
     try {
+      // 1. 更新 record 状态（approve 同时给积分）
+      final updateData = approved
+          ? {
+              'status': 'approved',
+              'approved_at': DateTime.now().toIso8601String(),
+              'points': _calcPoints(record),
+            }
+          : {
+              'status': 'rejected',
+              'rejection_reason': _rejectionReason,
+            };
+
       await _supabase
           .from('recycle_records')
-          .update({'status': status}).eq('id', recordId);
+          .update(updateData)
+          .eq('id', recordId);
+
+      // 2. 插入 notification 给该 user
+      final userId = record['user_id']?.toString();
+      final category = record['category']?.toString() ?? 'item';
+      final weight = (record['weight_kg'] as num?)?.toStringAsFixed(1) ?? '?';
+      final points = _calcPoints(record);
+
+      if (userId != null) {
+        if (approved) {
+          await _supabase.from('notifications').insert({
+            'user_id': userId,
+            'type': 'approved',
+            'title': 'Record Approved ✅',
+            'body':
+                'Your ${weight}kg $category recycling record has been approved! You earned $points points.',
+            'is_read': false,
+          });
+        } else {
+          await _supabase.from('notifications').insert({
+            'user_id': userId,
+            'type': 'rejected',
+            'title': 'Record Rejected ❌',
+            'body':
+                'Your ${weight}kg $category recycling record was not approved. Please ensure you are physically present at the station.',
+            'is_read': false,
+          });
+        }
+      }
 
       await Future.wait([
         _loadPendingRecords(),
@@ -188,6 +348,738 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     } catch (error) {
       _showSnack('Failed to update record status.', isError: true);
       debugPrint('Moderation update error: $error');
+    }
+  }
+
+  int _calcPoints(Map<String, dynamic> record) {
+    final weight = (record['weight_kg'] as num?)?.toDouble() ?? 0;
+    final category = (record['category'] ?? '').toString();
+    const pointsPerKg = {
+      'Plastic': 10,
+      'Paper': 8,
+      'Glass': 12,
+      'Metal': 15,
+    };
+    return (weight * (pointsPerKg[category] ?? 10)).round();
+  }
+
+  static const String _rejectionReason =
+      'Please ensure you are physically present at the recycling station when submitting.';
+
+  Future<void> _updateUserRole(Map<String, dynamic> user, bool isAdmin) async {
+    final userId = user['id'];
+    if (userId == null) {
+      _showSnack('Invalid user id.', isError: true);
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _isUpdatingUser = true);
+    }
+
+    try {
+      await _supabase.from('profiles').update({
+        'role': isAdmin ? 'admin' : 'user',
+        'is_admin': isAdmin,
+      }).eq('id', userId);
+
+      await _loadUsers();
+
+      if (!mounted) return;
+      setState(() {});
+      _showSnack(
+        isAdmin ? 'User promoted to admin.' : 'Admin access removed.',
+        isError: false,
+      );
+    } catch (error) {
+      _showSnack('Failed to update user role.', isError: true);
+      debugPrint('User role update error: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdatingUser = false);
+      }
+    }
+  }
+
+  Future<void> _openEditUserSheet(Map<String, dynamic> user) async {
+    final userId = user['id'];
+    if (userId == null) {
+      _showSnack('Invalid user id.', isError: true);
+      return;
+    }
+
+    final nameController =
+        TextEditingController(text: user['username']?.toString() ?? '');
+    final emailController =
+        TextEditingController(text: user['email']?.toString() ?? '');
+    final pointsController = TextEditingController(
+      text: (user['total_points'] ?? 0).toString(),
+    );
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 12,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+          ),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Edit User',
+                  style: GoogleFonts.dmSans(
+                    color: _ink,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildInputField(
+                  controller: nameController,
+                  label: 'Username',
+                  hint: 'Enter username',
+                ),
+                const SizedBox(height: 10),
+                _buildInputField(
+                  controller: emailController,
+                  label: 'Email',
+                  hint: 'Enter email',
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 10),
+                _buildInputField(
+                  controller: pointsController,
+                  label: 'Points',
+                  hint: '0',
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(sheetContext, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _ink,
+                          side: const BorderSide(color: Color(0xFFD4E6D8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(sheetContext, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Save'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (saved != true) {
+      nameController.dispose();
+      emailController.dispose();
+      pointsController.dispose();
+      return;
+    }
+
+    final points = int.tryParse(pointsController.text.trim()) ?? 0;
+
+    if (mounted) {
+      setState(() => _isUpdatingUser = true);
+    }
+    try {
+      await _supabase.from('profiles').update({
+        'username': nameController.text.trim(),
+        'email': emailController.text.trim(),
+        'total_points': points,
+      }).eq('id', userId);
+
+      await _loadUsers();
+      if (!mounted) return;
+      setState(() {});
+      _showSnack('User updated.', isError: false);
+    } catch (error) {
+      _showSnack('Failed to update user.', isError: true);
+      debugPrint('User update error: $error');
+    } finally {
+      nameController.dispose();
+      emailController.dispose();
+      pointsController.dispose();
+      if (mounted) {
+        setState(() => _isUpdatingUser = false);
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteUser(Map<String, dynamic> user) async {
+    final userId = user['id'];
+    if (userId == null) {
+      _showSnack('Invalid user id.', isError: true);
+      return;
+    }
+
+    final name = (user['username'] ?? user['email'] ?? 'this user').toString();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(
+          'Delete User',
+          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Delete $name from profiles? This cannot be undone.',
+          style: GoogleFonts.dmSans(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE05454),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != true) return;
+
+    if (mounted) {
+      setState(() => _isUpdatingUser = true);
+    }
+    try {
+      await _supabase.from('profiles').delete().eq('id', userId);
+      await _loadUsers();
+      if (!mounted) return;
+      setState(() {});
+      _showSnack('User deleted.', isError: false);
+    } catch (error) {
+      _showSnack('Failed to delete user.', isError: true);
+      debugPrint('User delete error: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdatingUser = false);
+      }
+    }
+  }
+
+  Future<void> _openEditRecordSheet(Map<String, dynamic> record) async {
+    final recordId = record['id'];
+    if (recordId == null) {
+      _showSnack('Invalid record id.', isError: true);
+      return;
+    }
+
+    final typeController =
+        TextEditingController(text: (record['category'] ?? '').toString());
+    final weightController = TextEditingController(
+      text: ((record['weight_kg'] as num?)?.toDouble() ?? 0).toString(),
+    );
+    final stationController =
+        TextEditingController(text: (record['station'] ?? '').toString());
+    final statusController =
+        TextEditingController(text: (record['status'] ?? 'pending').toString());
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 12,
+            bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+          ),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Edit Record',
+                  style: GoogleFonts.dmSans(
+                    color: _ink,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildInputField(
+                  controller: typeController,
+                  label: 'Recycle Type',
+                  hint: 'Plastic',
+                ),
+                const SizedBox(height: 10),
+                _buildInputField(
+                  controller: weightController,
+                  label: 'Weight (kg)',
+                  hint: '0.0',
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 10),
+                _buildInputField(
+                  controller: stationController,
+                  label: 'Station',
+                  hint: 'Station name',
+                ),
+                const SizedBox(height: 10),
+                _buildInputField(
+                  controller: statusController,
+                  label: 'Status',
+                  hint: 'pending / approved / rejected',
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(sheetContext, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _ink,
+                          side: const BorderSide(color: Color(0xFFD4E6D8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(sheetContext, true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('Save'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (saved != true) {
+      typeController.dispose();
+      weightController.dispose();
+      stationController.dispose();
+      statusController.dispose();
+      return;
+    }
+
+    final weight = double.tryParse(weightController.text.trim()) ?? 0;
+
+    if (mounted) {
+      setState(() => _isSavingRecord = true);
+    }
+    try {
+      await _supabase.from('recycle_records').update({
+        'category': typeController.text.trim(),
+        'weight_kg': weight,
+        'station': stationController.text.trim(),
+        'status': statusController.text.trim().toLowerCase(),
+      }).eq('id', recordId);
+
+      await Future.wait([
+        _loadRecords(),
+        _loadPendingRecords(),
+      ]);
+
+      if (!mounted) return;
+      setState(() {});
+      _showSnack('Record updated.', isError: false);
+    } catch (error) {
+      _showSnack('Failed to update record.', isError: true);
+      debugPrint('Record update error: $error');
+    } finally {
+      typeController.dispose();
+      weightController.dispose();
+      stationController.dispose();
+      statusController.dispose();
+      if (mounted) {
+        setState(() => _isSavingRecord = false);
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteRecord(Map<String, dynamic> record) async {
+    final recordId = record['id'];
+    if (recordId == null) {
+      _showSnack('Invalid record id.', isError: true);
+      return;
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(
+          'Delete Record',
+          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Delete this recycle record? This cannot be undone.',
+          style: GoogleFonts.dmSans(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE05454),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != true) return;
+
+    if (mounted) {
+      setState(() => _isSavingRecord = true);
+    }
+    try {
+      await _supabase.from('recycle_records').delete().eq('id', recordId);
+      await Future.wait([
+        _loadRecords(),
+        _loadPendingRecords(),
+      ]);
+      if (!mounted) return;
+      setState(() {});
+      _showSnack('Record deleted.', isError: false);
+    } catch (error) {
+      _showSnack('Failed to delete record.', isError: true);
+      debugPrint('Record delete error: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingRecord = false);
+      }
+    }
+  }
+
+  Future<void> _openRewardSheet({Map<String, dynamic>? editingReward}) async {
+    final isEditing = editingReward != null;
+    final nameController = TextEditingController(
+      text: (editingReward?['name'] ?? '').toString(),
+    );
+    final descriptionController = TextEditingController(
+      text: (editingReward?['description'] ?? '').toString(),
+    );
+    final pointsController = TextEditingController(
+      text: ((editingReward?['points_required'] as num?)?.toInt() ?? 0)
+          .toString(),
+    );
+    final quantityController = TextEditingController(
+      text: ((editingReward?['available_quantity'] as num?)?.toInt() ?? 0)
+          .toString(),
+    );
+
+    bool isActive = editingReward?['is_active'] == null
+        ? true
+        : editingReward?['is_active'] == true;
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 12,
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
+              ),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isEditing ? 'Edit Reward' : 'Add Reward',
+                      style: GoogleFonts.dmSans(
+                        color: _ink,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInputField(
+                      controller: nameController,
+                      label: 'Reward Name',
+                      hint: 'TNG RM5 Reload PIN',
+                    ),
+                    const SizedBox(height: 10),
+                    _buildInputField(
+                      controller: descriptionController,
+                      label: 'Description',
+                      hint: 'Digital reload voucher',
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildInputField(
+                      controller: pointsController,
+                      label: 'Points Required',
+                      hint: '500',
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildInputField(
+                      controller: quantityController,
+                      label: 'Available Quantity',
+                      hint: '100',
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 8),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: isActive,
+                      activeColor: _primary,
+                      title: Text(
+                        'Reward is active',
+                        style: GoogleFonts.dmSans(
+                          color: _ink,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        setSheetState(() => isActive = value);
+                      },
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(sheetContext, false),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _ink,
+                              side: const BorderSide(color: Color(0xFFD4E6D8)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.pop(sheetContext, true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(isEditing ? 'Update' : 'Add'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (saved != true) {
+      nameController.dispose();
+      descriptionController.dispose();
+      pointsController.dispose();
+      quantityController.dispose();
+      return;
+    }
+
+    final payload = <String, dynamic>{
+      'name': nameController.text.trim(),
+      'description': descriptionController.text.trim(),
+      'points_required': int.tryParse(pointsController.text.trim()) ?? 0,
+      'available_quantity': int.tryParse(quantityController.text.trim()) ?? 0,
+      'is_active': isActive,
+    };
+
+    if (mounted) {
+      setState(() => _isSavingReward = true);
+    }
+    try {
+      if (isEditing) {
+        await _supabase
+            .from('admin_rewards')
+            .update(payload)
+            .eq('id', editingReward['id']);
+      } else {
+        payload['redeemed_count'] = 0;
+        await _supabase.from('admin_rewards').insert(payload);
+      }
+      await _loadRewards();
+      if (!mounted) return;
+      setState(() {});
+      _showSnack(isEditing ? 'Reward updated.' : 'Reward added.',
+          isError: false);
+    } catch (error) {
+      _showSnack(
+        isEditing ? 'Failed to update reward.' : 'Failed to add reward.',
+        isError: true,
+      );
+      debugPrint('Reward save error: $error');
+    } finally {
+      nameController.dispose();
+      descriptionController.dispose();
+      pointsController.dispose();
+      quantityController.dispose();
+      if (mounted) {
+        setState(() => _isSavingReward = false);
+      }
+    }
+  }
+
+  Future<void> _toggleRewardStatus(Map<String, dynamic> reward) async {
+    final rewardId = reward['id'];
+    if (rewardId == null) {
+      _showSnack('Invalid reward id.', isError: true);
+      return;
+    }
+    final next = !(reward['is_active'] == true);
+    if (mounted) {
+      setState(() => _isSavingReward = true);
+    }
+    try {
+      await _supabase
+          .from('admin_rewards')
+          .update({'is_active': next}).eq('id', rewardId);
+      await _loadRewards();
+      if (!mounted) return;
+      setState(() {});
+      _showSnack(next ? 'Reward enabled.' : 'Reward disabled.', isError: false);
+    } catch (error) {
+      _showSnack('Failed to toggle reward status.', isError: true);
+      debugPrint('Reward toggle error: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingReward = false);
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteReward(Map<String, dynamic> reward) async {
+    final rewardId = reward['id'];
+    if (rewardId == null) {
+      _showSnack('Invalid reward id.', isError: true);
+      return;
+    }
+    final rewardName = (reward['name'] ?? 'this reward').toString();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(
+          'Delete Reward',
+          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Delete $rewardName? This cannot be undone.',
+          style: GoogleFonts.dmSans(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE05454),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != true) return;
+
+    if (mounted) {
+      setState(() => _isSavingReward = true);
+    }
+    try {
+      await _supabase.from('admin_rewards').delete().eq('id', rewardId);
+      await _loadRewards();
+      if (!mounted) return;
+      setState(() {});
+      _showSnack('Reward deleted.', isError: false);
+    } catch (error) {
+      _showSnack('Failed to delete reward.', isError: true);
+      debugPrint('Reward delete error: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingReward = false);
+      }
     }
   }
 
@@ -211,6 +1103,43 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       _stationsLoadError =
           'Station table unavailable. Create table "recycling_stations" to manage stations.';
       debugPrint('Station load error: $error');
+    }
+  }
+
+  Future<void> _toggleStationOpen(Map<String, dynamic> station) async {
+    final stationId = station['id'];
+    if (stationId == null) {
+      _showSnack('Invalid station id.', isError: true);
+      return;
+    }
+
+    final currentIsOpen =
+        station['is_open'] == null ? true : station['is_open'] == true;
+    final nextIsOpen = !currentIsOpen;
+
+    if (mounted) {
+      setState(() => _isSavingStation = true);
+    }
+
+    try {
+      await _supabase
+          .from('recycling_stations')
+          .update({'is_open': nextIsOpen}).eq('id', stationId);
+
+      await _loadStations();
+      if (!mounted) return;
+      setState(() {});
+      _showSnack(
+        nextIsOpen ? 'Station marked open.' : 'Station marked closed.',
+        isError: false,
+      );
+    } catch (error) {
+      _showSnack('Failed to update station status.', isError: true);
+      debugPrint('Station status update error: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingStation = false);
+      }
     }
   }
 
@@ -818,11 +1747,25 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
                   users: _users,
                   records: _records,
                   pendingRecords: _pendingRecords,
+                  stations: _stations,
                   onRefresh: _loadAllData,
                   onModerateRecord: _moderatePendingRecord,
                 ),
                 AdminUsersTab(
-                  users: _users,
+                  users: _filteredUsers,
+                  totalUsers: _users.length,
+                  totalAdmins: _users.where((user) {
+                    final role = (user['role'] ?? '').toString().toLowerCase();
+                    return role == 'admin' || user['is_admin'] == true;
+                  }).length,
+                  searchQuery: _userSearchQuery,
+                  onSearchChanged: (value) {
+                    setState(() => _userSearchQuery = value);
+                  },
+                  isUpdatingUser: _isUpdatingUser,
+                  onToggleAdmin: _updateUserRole,
+                  onEditUser: _openEditUserSheet,
+                  onDeleteUser: _confirmDeleteUser,
                   onRefresh: _loadUsers,
                 ),
                 AdminStationsTab(
@@ -843,6 +1786,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
                     );
                   },
                   onDeleteStation: _confirmDeleteStation,
+                  onToggleStationOpen: _toggleStationOpen,
                   onSelectStationPoint: (point) {
                     setState(() => _selectedStationPoint = point);
                   },
@@ -853,6 +1797,30 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
                     );
                   },
                   stationPointFromMap: _stationPointFromMap,
+                ),
+                AdminRecordsTab(
+                  records: _filteredRecords,
+                  totalRecords: _records.length,
+                  searchQuery: _recordSearchQuery,
+                  isSavingRecord: _isSavingRecord,
+                  onSearchChanged: (value) {
+                    setState(() => _recordSearchQuery = value);
+                  },
+                  onRefresh: _loadRecords,
+                  onEditRecord: _openEditRecordSheet,
+                  onDeleteRecord: _confirmDeleteRecord,
+                ),
+                AdminRewardsTab(
+                  rewards: _rewards,
+                  totalRedemptions: _totalRedemptions,
+                  rewardsLoadError: _rewardsLoadError,
+                  isSavingReward: _isSavingReward,
+                  onRefresh: _loadRewards,
+                  onAddReward: () => _openRewardSheet(),
+                  onEditReward: (reward) =>
+                      _openRewardSheet(editingReward: reward),
+                  onDeleteReward: _confirmDeleteReward,
+                  onToggleReward: _toggleRewardStatus,
                 ),
               ],
             ),
@@ -895,6 +1863,18 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
                 Icon(Icons.location_on_rounded, color: Color(0xFF1A4731)),
             label: 'Stations',
           ),
+          NavigationDestination(
+            icon: Icon(Icons.receipt_long_rounded, color: Colors.white70),
+            selectedIcon:
+                Icon(Icons.receipt_long_rounded, color: Color(0xFF1A4731)),
+            label: 'Records',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.card_giftcard_rounded, color: Colors.white70),
+            selectedIcon:
+                Icon(Icons.card_giftcard_rounded, color: Color(0xFF1A4731)),
+            label: 'Rewards',
+          ),
         ],
       ),
     );
@@ -905,6 +1885,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       users: _users,
       records: _records,
       pendingRecords: _pendingRecords,
+      stations: _stations,
       onRefresh: _loadAllData,
       onModerateRecord: _moderatePendingRecord,
     );
@@ -912,17 +1893,55 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
 
   Widget _buildUsersTab() {
     return AdminUsersTab(
-      users: _users,
+      users: _filteredUsers,
+      totalUsers: _users.length,
+      totalAdmins: _users.where((user) {
+        final role = (user['role'] ?? '').toString().toLowerCase();
+        return role == 'admin' || user['is_admin'] == true;
+      }).length,
+      searchQuery: _userSearchQuery,
+      onSearchChanged: (value) {
+        setState(() => _userSearchQuery = value);
+      },
+      isUpdatingUser: _isUpdatingUser,
+      onToggleAdmin: _updateUserRole,
+      onEditUser: _openEditUserSheet,
+      onDeleteUser: _confirmDeleteUser,
       onRefresh: _loadUsers,
     );
   }
 
   Widget _buildRecordsTab() {
-    return _buildOverviewTab();
+    return AdminRecordsTab(
+      records: _filteredRecords,
+      totalRecords: _records.length,
+      searchQuery: _recordSearchQuery,
+      isSavingRecord: _isSavingRecord,
+      onSearchChanged: (value) {
+        setState(() => _recordSearchQuery = value);
+      },
+      onRefresh: _loadRecords,
+      onEditRecord: _openEditRecordSheet,
+      onDeleteRecord: _confirmDeleteRecord,
+    );
   }
 
   Widget _buildPendingSubmissionsTab() {
     return _buildOverviewTab();
+  }
+
+  Widget _buildRewardsTab() {
+    return AdminRewardsTab(
+      rewards: _rewards,
+      totalRedemptions: _totalRedemptions,
+      rewardsLoadError: _rewardsLoadError,
+      isSavingReward: _isSavingReward,
+      onRefresh: _loadRewards,
+      onAddReward: () => _openRewardSheet(),
+      onEditReward: (reward) => _openRewardSheet(editingReward: reward),
+      onDeleteReward: _confirmDeleteReward,
+      onToggleReward: _toggleRewardStatus,
+    );
   }
 
   Widget _buildStationsTab() {
@@ -944,6 +1963,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
         );
       },
       onDeleteStation: _confirmDeleteStation,
+      onToggleStationOpen: _toggleStationOpen,
       onSelectStationPoint: (point) {
         setState(() => _selectedStationPoint = point);
       },
