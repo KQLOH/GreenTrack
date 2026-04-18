@@ -9,7 +9,7 @@ Future<void> main() async {
 
   await Supabase.initialize(
     url: 'https://thctyiijpgdeclqyflrr.supabase.co',
-    anonKey: 'sb_publishable_VLbVJYrdW2EF3QW7h5iPXg_B1h6u6tn',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoY3R5aWlqcGdkZWNscXlmbHJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQwNjU3NTAsImV4cCI6MjA4OTY0MTc1MH0.hc9h7ikvRJtrtzZf1rTN1ty6GGDvFOYiZfusj3DVk3U',
   );
 
   await _verifySupabaseConnection();

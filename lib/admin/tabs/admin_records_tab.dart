@@ -1,38 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class AdminUsersTab extends StatefulWidget {
-  const AdminUsersTab({
+class AdminRecordsTab extends StatefulWidget {
+  const AdminRecordsTab({
     super.key,
-    required this.users,
-    required this.totalUsers,
-    required this.totalAdmins,
+    required this.records,
+    required this.totalRecords,
     required this.searchQuery,
+    required this.isSavingRecord,
     required this.onSearchChanged,
-    required this.isUpdatingUser,
-    required this.onToggleAdmin,
-    required this.onEditUser,
-    required this.onDeleteUser,
     required this.onRefresh,
+    required this.onEditRecord,
+    required this.onDeleteRecord,
   });
 
-  final List<Map<String, dynamic>> users;
-  final int totalUsers;
-  final int totalAdmins;
+  final List<Map<String, dynamic>> records;
+  final int totalRecords;
   final String searchQuery;
+  final bool isSavingRecord;
   final ValueChanged<String> onSearchChanged;
-  final bool isUpdatingUser;
-  final Future<void> Function(Map<String, dynamic> user, bool isAdmin)
-      onToggleAdmin;
-  final Future<void> Function(Map<String, dynamic> user) onEditUser;
-  final Future<void> Function(Map<String, dynamic> user) onDeleteUser;
   final Future<void> Function() onRefresh;
+  final Future<void> Function(Map<String, dynamic> record) onEditRecord;
+  final Future<void> Function(Map<String, dynamic> record) onDeleteRecord;
 
   @override
-  State<AdminUsersTab> createState() => _AdminUsersTabState();
+  State<AdminRecordsTab> createState() => _AdminRecordsTabState();
 }
 
-class _AdminUsersTabState extends State<AdminUsersTab> {
+class _AdminRecordsTabState extends State<AdminRecordsTab> {
   static const Color _ink = Color(0xFF1A4731);
   static const Color _primary = Color(0xFF2D7A4F);
 
@@ -45,7 +40,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
   }
 
   @override
-  void didUpdateWidget(covariant AdminUsersTab oldWidget) {
+  void didUpdateWidget(covariant AdminRecordsTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.searchQuery != widget.searchQuery &&
         _searchController.text != widget.searchQuery) {
@@ -70,11 +65,11 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
         padding: const EdgeInsets.all(16),
         children: [
           _sectionHeader(
-            title: 'Users',
-            subtitle: 'Registered users and point balances.',
+            title: 'Records',
+            subtitle: 'Manage all recycle records from Supabase.',
             action: _chip(
-              Icons.groups_rounded,
-              '${widget.totalAdmins} admin${widget.totalAdmins == 1 ? '' : 's'} / ${widget.totalUsers} users',
+              Icons.dataset_rounded,
+              'Total: ${widget.totalRecords}',
               const Color(0xFFE8F5EE),
               _primary,
             ),
@@ -84,7 +79,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
             controller: _searchController,
             onChanged: widget.onSearchChanged,
             decoration: InputDecoration(
-              hintText: 'Search by username, email, or role',
+              hintText: 'Search by type, station, status, or user',
               prefixIcon: const Icon(Icons.search_rounded),
               filled: true,
               fillColor: Colors.white,
@@ -105,60 +100,80 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
             ),
           ),
           const SizedBox(height: 12),
-          if (widget.users.isEmpty)
+          if (widget.records.isEmpty)
             _simpleSectionCard(
-              title: 'No users',
+              title: 'No records',
               child: Text(
                 widget.searchQuery.trim().isEmpty
-                    ? 'No profile records found.'
-                    : 'No users match "${widget.searchQuery}".',
+                    ? 'No recycle records found.'
+                    : 'No records match "${widget.searchQuery}".',
                 style: GoogleFonts.dmSans(color: Colors.grey.shade600),
               ),
             )
           else
-            ...widget.users.map((user) {
-              final isAdmin = user['is_admin'] == true ||
-                  (user['role'] ?? '').toString().toLowerCase() == 'admin';
+            ...widget.records.map((record) {
+              final status = (record['status'] ?? 'pending').toString();
+              final submittedBy = (record['submitted_user'] ??
+                      record['user_email'] ??
+                      record['user_id'] ??
+                      '-')
+                  .toString();
+              final createdAt = (record['created_at'] ?? record['date'] ?? '-')
+                  .toString()
+                  .split('T')
+                  .first;
+
               return _simpleSectionCard(
-                title: user['username']?.toString() ?? 'Unknown',
+                title:
+                    '${record['category'] ?? '-'} • ${record['weight_kg'] ?? '-'} kg',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Email: ${user['email'] ?? '-'}',
-                      style: GoogleFonts.dmSans(color: Colors.grey.shade700),
-                    ),
-                    const SizedBox(height: 6),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: [
                         _chip(
-                          Icons.workspace_premium_rounded,
-                          'Points: ${user['total_points'] ?? 0}',
-                          const Color(0xFFE8F5EE),
-                          _primary,
+                          Icons.person_outline_rounded,
+                          submittedBy,
+                          const Color(0xFFF7F9F8),
+                          _ink,
                         ),
                         _chip(
-                          isAdmin
-                              ? Icons.verified_rounded
-                              : Icons.person_rounded,
-                          isAdmin ? 'Admin' : 'User',
-                          isAdmin
-                              ? const Color(0xFFE8F1FB)
-                              : const Color(0xFFF7F9F8),
-                          isAdmin ? const Color(0xFF4A90D9) : _ink,
+                          Icons.storefront_rounded,
+                          (record['station'] ?? '-').toString(),
+                          const Color(0xFFE8F1FB),
+                          const Color(0xFF4A90D9),
+                        ),
+                        _chip(
+                          Icons.info_outline_rounded,
+                          status,
+                          status.toLowerCase() == 'approved'
+                              ? const Color(0xFFE8F5EE)
+                              : status.toLowerCase() == 'rejected'
+                                  ? const Color(0xFFFFF0F0)
+                                  : const Color(0xFFFFF8E9),
+                          status.toLowerCase() == 'approved'
+                              ? const Color(0xFF3DAB6A)
+                              : status.toLowerCase() == 'rejected'
+                                  ? const Color(0xFFE05454)
+                                  : const Color(0xFFE39B35),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Date: $createdAt',
+                      style: GoogleFonts.dmSans(color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: widget.isUpdatingUser
+                            onPressed: widget.isSavingRecord
                                 ? null
-                                : () => widget.onEditUser(user),
+                                : () => widget.onEditRecord(record),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: _ink,
                               side: const BorderSide(color: Color(0xFFD4E6D8)),
@@ -173,9 +188,9 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: widget.isUpdatingUser
+                            onPressed: widget.isSavingRecord
                                 ? null
-                                : () => widget.onDeleteUser(user),
+                                : () => widget.onDeleteRecord(record),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFFE05454),
                               side: const BorderSide(color: Color(0xFFE05454)),
@@ -186,27 +201,6 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                             icon: const Icon(Icons.delete_outline_rounded,
                                 size: 16),
                             label: const Text('Delete'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextButton.icon(
-                            onPressed: widget.isUpdatingUser
-                                ? null
-                                : () => widget.onToggleAdmin(user, !isAdmin),
-                            style: TextButton.styleFrom(
-                              foregroundColor:
-                                  isAdmin ? const Color(0xFFE05454) : _primary,
-                            ),
-                            icon: Icon(
-                              isAdmin
-                                  ? Icons.remove_moderator_rounded
-                                  : Icons.verified_user_rounded,
-                              size: 16,
-                            ),
-                            label: Text(
-                              isAdmin ? 'Remove' : 'Admin',
-                            ),
                           ),
                         ),
                       ],
