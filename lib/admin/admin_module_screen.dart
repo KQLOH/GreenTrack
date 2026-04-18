@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'tabs/admin_dashboard_tab.dart';
 import 'tabs/admin_records_tab.dart';
@@ -280,13 +281,12 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     Map<String, dynamic> record,
     bool approved,
   ) async {
-    final recordId = record['id'];
+    final recordId = record['id'] ?? record['record_id'];
+    final idColumn = record['id'] != null ? 'id' : 'record_id';
     if (recordId == null) {
       _showSnack('Invalid record id.', isError: true);
       return;
     }
-
-    final status = approved ? 'approved' : 'rejected';
 
     try {
       // 1. 更新 record 状态（approve 同时给积分）
@@ -301,36 +301,53 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
               'rejection_reason': _rejectionReason,
             };
 
-      await _supabase
+      final updated = await _supabase
           .from('recycle_records')
           .update(updateData)
-          .eq('id', recordId);
+          .eq(idColumn, recordId)
+          .select(idColumn)
+          .limit(1);
+
+      final updatedRows = List<Map<String, dynamic>>.from(updated as List);
+      if (updatedRows.isEmpty) {
+        _showSnack(
+          'No record updated. Check RLS/update permissions for recycle_records.',
+          isError: true,
+        );
+        return;
+      }
 
       // 2. 插入 notification 给该 user
       final userId = record['user_id']?.toString();
       final category = record['category']?.toString() ?? 'item';
       final weight = (record['weight_kg'] as num?)?.toStringAsFixed(1) ?? '?';
       final points = _calcPoints(record);
+      var notificationFailed = false;
 
       if (userId != null) {
-        if (approved) {
-          await _supabase.from('notifications').insert({
-            'user_id': userId,
-            'type': 'approved',
-            'title': 'Record Approved ✅',
-            'body':
-                'Your ${weight}kg $category recycling record has been approved! You earned $points points.',
-            'is_read': false,
-          });
-        } else {
-          await _supabase.from('notifications').insert({
-            'user_id': userId,
-            'type': 'rejected',
-            'title': 'Record Rejected ❌',
-            'body':
-                'Your ${weight}kg $category recycling record was not approved. Please ensure you are physically present at the station.',
-            'is_read': false,
-          });
+        try {
+          if (approved) {
+            await _supabase.from('notifications').insert({
+              'user_id': userId,
+              'type': 'approved',
+              'title': 'Record Approved ✅',
+              'body':
+                  'Your ${weight}kg $category recycling record has been approved! You earned $points points.',
+              'is_read': false,
+            });
+          } else {
+            await _supabase.from('notifications').insert({
+              'user_id': userId,
+              'type': 'rejected',
+              'title': 'Record Rejected ❌',
+              'body':
+                  'Your ${weight}kg $category recycling record was not approved. Please ensure you are physically present at the station.',
+              'is_read': false,
+            });
+          }
+        } catch (notificationError) {
+          notificationFailed = true;
+          debugPrint('Notification insert error: $notificationError');
         }
       }
 
@@ -342,11 +359,20 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       if (!mounted) return;
       setState(() {});
       _showSnack(
-        approved ? 'Record approved.' : 'Record rejected.',
+        approved
+            ? (notificationFailed
+                ? 'Record approved. Notification not sent (RLS policy).'
+                : 'Record approved.')
+            : (notificationFailed
+                ? 'Record rejected. Notification not sent (RLS policy).'
+                : 'Record rejected.'),
         isError: false,
       );
     } catch (error) {
-      _showSnack('Failed to update record status.', isError: true);
+      final detail = error is PostgrestException
+          ? (error.message.isNotEmpty ? error.message : error.code)
+          : error.toString();
+      _showSnack('Failed to update record status. $detail', isError: true);
       debugPrint('Moderation update error: $error');
     }
   }

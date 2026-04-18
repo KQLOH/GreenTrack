@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import 'register_screen.dart';
+import 'forgot_password_screen.dart';
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,6 +21,7 @@ class _LoginScreenState extends State<LoginScreen>
   final _authService = AuthService();
 
   bool _isLoading = false;
+  String? _loginErrorMessage;
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
@@ -54,20 +57,26 @@ class _LoginScreenState extends State<LoginScreen>
 
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loginErrorMessage = null; // 每次點擊登錄時先清空之前的錯誤
+    });
+
     try {
       await _authService.signIn(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
+      // 登錄成功後的邏輯...
     } on AuthException catch (e) {
-      if (mounted) {
-        _showError(e.message);
-      }
+      setState(() {
+        // 這裡可以自定義顯示的文字，例如 "Invalid email or password"
+        _loginErrorMessage = "Invalid email or password. Please try again.";
+      });
     } catch (e) {
-      if (mounted) {
-        _showError('An unexpected error occurred. Please try again.');
-      }
+      setState(() {
+        _loginErrorMessage = "An unexpected error occurred.";
+      });
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -190,6 +199,33 @@ class _LoginScreenState extends State<LoginScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // --- 新增：顯示在 EMAIL 字樣樓上的 Error Message ---
+                            if (_loginErrorMessage != null)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                    bottom: 16, left: 4), // 加一點左邊距對齊 Label
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start, // 如果訊息很長可以對齊頂部
+                                  children: [
+                                    // 亮紅色的圖標，起到警示作用
+                                    const Icon(Icons.error_outline_rounded,
+                                        color: Color(0xFFFF5252), size: 18),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _loginErrorMessage!,
+                                        style: GoogleFonts.dmSans(
+                                          color: Colors.white, // 依照你的要求使用純白色字
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          height: 1.4, // 增加行高，閱讀起來更舒服
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             // Email field
                             _GreenTextField(
                               label: 'EMAIL',
@@ -228,7 +264,29 @@ class _LoginScreenState extends State<LoginScreen>
                               },
                             ),
 
-                            const SizedBox(height: 28),
+                            const SizedBox(height: 2),
+                            //f0rgot pwrd
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => ForgotPasswordScreen()),
+                                  );
+                                },
+                                child: Text(
+                                  'Forgot Password?',
+                                  style: GoogleFonts.dmSans(
+                                    color: const Color(0xFF7EEDB0),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 1),
 
                             // Login button
                             SizedBox(
@@ -305,7 +363,12 @@ class _LoginScreenState extends State<LoginScreen>
                               height: 54,
                               child: OutlinedButton(
                                 onPressed: () {
-                                  // TODO: implement Google Sign-In
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const HomeScreen(),
+                                    ),
+                                  );
                                 },
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(
@@ -321,26 +384,15 @@ class _LoginScreenState extends State<LoginScreen>
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    // Google dot icon
-                                    Container(
-                                      width: 20,
-                                      height: 20,
-                                      decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: SweepGradient(
-                                          colors: [
-                                            Color(0xFF4285F4),
-                                            Color(0xFFEA4335),
-                                            Color(0xFFFBBC05),
-                                            Color(0xFF34A853),
-                                            Color(0xFF4285F4),
-                                          ],
-                                        ),
-                                      ),
+                                    Icon(
+                                      Icons.person_outline_rounded,
+                                      color:
+                                          Colors.white.withValues(alpha: 0.8),
+                                      size: 22,
                                     ),
                                     const SizedBox(width: 12),
                                     Text(
-                                      'Continue with Google',
+                                      'Continue as Guest',
                                       style: GoogleFonts.dmSans(
                                         color: Colors.white,
                                         fontSize: 15,
