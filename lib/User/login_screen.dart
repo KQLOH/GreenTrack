@@ -68,12 +68,12 @@ class _LoginScreenState extends State<LoginScreen>
         password: _passwordController.text.trim(),
       );
       // 登錄成功後的邏輯...
-    } on AuthException catch (e) {
+    } on AuthException {
       setState(() {
         // 這裡可以自定義顯示的文字，例如 "Invalid email or password"
         _loginErrorMessage = "Invalid email or password. Please try again.";
       });
-    } catch (e) {
+    } catch (_) {
       setState(() {
         _loginErrorMessage = "An unexpected error occurred.";
       });
@@ -82,27 +82,6 @@ class _LoginScreenState extends State<LoginScreen>
         setState(() => _isLoading = false);
       }
     }
-  }
-
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.white, size: 18),
-            const SizedBox(width: 10),
-            Expanded(
-              child:
-                  Text(message, style: GoogleFonts.dmSans(color: Colors.white)),
-            ),
-          ],
-        ),
-        backgroundColor: Colors.red.shade600,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-      ),
-    );
   }
 
   @override
@@ -273,7 +252,8 @@ class _LoginScreenState extends State<LoginScreen>
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                        builder: (_) => ForgotPasswordScreen()),
+                                        builder: (_) =>
+                                            const ForgotPasswordScreen()),
                                   );
                                 },
                                 child: Text(

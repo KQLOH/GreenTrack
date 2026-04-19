@@ -18,9 +18,6 @@ class AdminDashboardTab extends StatefulWidget {
     required this.onModerateRecord,
   });
 
-  static const Color _primary = Color(0xFF2D7A4F);
-  static const Color _ink = Color(0xFF1A4731);
-
   final List<Map<String, dynamic>> users;
   final List<Map<String, dynamic>> records;
   final List<Map<String, dynamic>> pendingRecords;

@@ -1,12 +1,18 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:io';
+import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 import '../admin/admin_module_screen.dart';
 import '../services/supabase_client.dart';
+import '../services/auth_service.dart';
 import 'recycle_map_screen.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:convert';
 
 final _supabase = supabaseClient;
+final _authService = AuthService();
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -31,13 +37,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+    if (!mounted) return;
+
+    // Only show full screen loading if we don't have profile data yet (initial load)
+    if (_profile == null) {
+      setState(() => _isLoading = true);
+    }
+
     try {
-      final user = _supabase.auth.currentUser;
+      // 1. Refresh the Auth session to get the absolute latest confirmed email
+      final sessionRes = await _supabase.auth.refreshSession();
+      final user = sessionRes.user;
+
       if (user == null) return;
 
+      // 2. Fetch the profile from the database table
       final profile =
           await _supabase.from('profiles').select().eq('id', user.id).single();
+
+      // 3. AUTO-SYNC: If Auth email (verified link) is different from Table, update table
+      if (user.email != null && profile['email'] != user.email) {
+        await _supabase
+            .from('profiles')
+            .update({'email': user.email}).eq('id', user.id);
+        profile['email'] = user.email;
+      }
 
       final records = await _supabase
           .from('recycle_records')
@@ -55,7 +79,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final role = (profile['role'] ?? '').toString().toLowerCase();
         final isAdminFlag = profile['is_admin'] == true;
 
-        // Load unread notifications count
         int unreadCount = 0;
         try {
           final unread = await _supabase
@@ -68,7 +91,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         setState(() {
           _profile = Map<String, dynamic>.from(profile);
-          _profile!['email'] = user.email ?? '';
+          _profile!['email'] = user.email ?? profile['email'] ?? '';
           _isAdmin = isAdminFlag || role == 'admin';
           _totalWeight = totalWeight;
           _co2Saved = totalWeight * 2.5;
@@ -125,15 +148,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (confirm == true) await _supabase.auth.signOut();
   }
 
-  void _showEditUsernameSheet() async {
-    final controller = TextEditingController(text: _profile?['username'] ?? '');
+  void _showEditProfileSheet() async {
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _EditUsernameSheet(controller: controller),
+      builder: (_) => EditProfileSheet(
+        currentUsername: _profile?['username'] ?? '',
+        currentEmail: _profile?['email'] ?? '',
+      ),
     );
-    if (result == true) await _loadData();
+    if (result == true) {
+      await _loadData();
+    }
+  }
+
+  void _showChangePasswordSheet() async {
+    final authEmail = _supabase.auth.currentUser?.email ?? '';
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ChangePasswordSheet(
+        email: authEmail,
+      ),
+    );
+  }
+
+  Future<void> _pickAndUploadAvatar() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+      maxWidth: 512,
+    );
+
+    if (image != null) {
+      setState(() => _isLoading = true);
+      try {
+        await _authService.uploadAvatar(File(image.path));
+        await _loadData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Avatar updated successfully!'),
+            backgroundColor: Color(0xFF2D7A4F),
+          ));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Failed to upload avatar: $e'),
+            backgroundColor: const Color(0xFFE05454),
+          ));
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
   }
 
   void _openNotifications() async {
@@ -145,7 +216,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         userId: _supabase.auth.currentUser?.id ?? '',
       ),
     );
-    // Refresh unread count after closing
     await _loadData();
   }
 
@@ -154,11 +224,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
         context, MaterialPageRoute(builder: (_) => const AdminModuleScreen()));
   }
 
+  void _showComingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('$feature – coming soon!',
+          style: GoogleFonts.dmSans(color: Colors.white)),
+      backgroundColor: const Color(0xFF2D7A4F),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.all(16),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final level = _ecoLevel();
     final username = _profile?['username'] ?? 'User';
     final email = _profile?['email'] ?? '';
+    final avatarUrl = _profile?['avatar_url'];
     final joinedRaw = _profile?['created_at'];
     final joined = joinedRaw != null
         ? DateTime.parse(joinedRaw).toLocal().toString().substring(0, 10)
@@ -169,290 +251,330 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF2D7A4F)))
-          : CustomScrollView(
-              slivers: [
-                // ── Header ────────────────────────────────────────────────
-                SliverToBoxAdapter(
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFF1A4731), Color(0xFF2D7A4F)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+          : RefreshIndicator(
+              color: const Color(0xFF2D7A4F),
+              onRefresh: _loadData,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  // ── Header ────────────────────────────────────────────────
+                  SliverToBoxAdapter(
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF1A4731), Color(0xFF2D7A4F)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                       ),
-                    ),
-                    child: SafeArea(
-                      bottom: false,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-                        child: Column(children: [
-                          Row(children: [
-                            GestureDetector(
-                              onTap: () => Navigator.pop(context),
-                              child: Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.2)),
+                      child: SafeArea(
+                        bottom: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                          child: Column(children: [
+                            Row(children: [
+                              const SizedBox(width: 38, height: 38),
+                              const Spacer(),
+                              Text('Profile',
+                                  style: GoogleFonts.dmSans(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600)),
+                              const Spacer(),
+                              GestureDetector(
+                                onTap: _showEditProfileSheet,
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                        color: Colors.white.withOpacity(0.2)),
+                                  ),
+                                  child: const Icon(Icons.edit_outlined,
+                                      color: Colors.white, size: 17),
                                 ),
-                                child: const Icon(
-                                    Icons.arrow_back_ios_new_rounded,
-                                    color: Colors.white,
-                                    size: 16),
                               ),
-                            ),
-                            const Spacer(),
-                            Text('Profile',
-                                style: GoogleFonts.dmSans(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600)),
-                            const Spacer(),
-                            GestureDetector(
-                              onTap: _showEditUsernameSheet,
-                              child: Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.2)),
+                            ]),
+                            const SizedBox(height: 24),
+                            Stack(
+                              children: [
+                                GestureDetector(
+                                  onTap: _pickAndUploadAvatar,
+                                  child: Container(
+                                    width: 84,
+                                    height: 84,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF7EEDB0),
+                                      borderRadius: BorderRadius.circular(26),
+                                      image: avatarUrl != null
+                                          ? DecorationImage(
+                                              image: avatarUrl
+                                                      .startsWith('data:image')
+                                                  ? MemoryImage(base64Decode(
+                                                          avatarUrl
+                                                              .split(',')
+                                                              .last))
+                                                      as ImageProvider
+                                                  : NetworkImage(avatarUrl),
+                                              fit: BoxFit.cover,
+                                            )
+                                          : null,
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color:
+                                                Colors.black.withOpacity(0.15),
+                                            blurRadius: 16,
+                                            offset: const Offset(0, 6))
+                                      ],
+                                    ),
+                                    child: avatarUrl == null
+                                        ? Center(
+                                            child: Text(
+                                              username.isNotEmpty
+                                                  ? username[0].toUpperCase()
+                                                  : 'U',
+                                              style: GoogleFonts.dmSerifDisplay(
+                                                  color:
+                                                      const Color(0xFF1A4731),
+                                                  fontSize: 34),
+                                            ),
+                                          )
+                                        : null,
+                                  ),
                                 ),
-                                child: const Icon(Icons.edit_outlined,
-                                    color: Colors.white, size: 17),
-                              ),
-                            ),
-                          ]),
-                          const SizedBox(height: 24),
-                          Container(
-                            width: 72,
-                            height: 72,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF7EEDB0),
-                              borderRadius: BorderRadius.circular(22),
-                              boxShadow: [
-                                BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.15),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6))
+                                Positioned(
+                                  right: -2,
+                                  bottom: -2,
+                                  child: GestureDetector(
+                                    onTap: _pickAndUploadAvatar,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF3DAB6A),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                          Icons.camera_alt_rounded,
+                                          color: Colors.white,
+                                          size: 14),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
-                            child: Center(
-                              child: Text(
-                                username.isNotEmpty
-                                    ? username[0].toUpperCase()
-                                    : 'U',
+                            const SizedBox(height: 12),
+                            Text(username,
                                 style: GoogleFonts.dmSerifDisplay(
-                                    color: const Color(0xFF1A4731),
-                                    fontSize: 30),
+                                    color: Colors.white, fontSize: 22)),
+                            const SizedBox(height: 4),
+                            Text(email,
+                                style: GoogleFonts.dmSans(
+                                    color: Colors.white60, fontSize: 13)),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2D7A4F),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color: const Color(0xFF7EEDB0)
+                                        .withOpacity(0.4),
+                                    width: 1.5),
                               ),
+                              child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.eco_rounded,
+                                        color: Color(0xFF7EEDB0), size: 15),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                        '${level['label']} · Lv. ${level['level']}',
+                                        style: GoogleFonts.dmSans(
+                                            color: const Color(0xFF7EEDB0),
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600)),
+                                  ]),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(username,
-                              style: GoogleFonts.dmSerifDisplay(
-                                  color: Colors.white, fontSize: 22)),
-                          const SizedBox(height: 4),
-                          Text(email,
-                              style: GoogleFonts.dmSans(
-                                  color: Colors.white60, fontSize: 13)),
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 7),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2D7A4F),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: const Color(0xFF7EEDB0)
-                                      .withValues(alpha: 0.4),
-                                  width: 1.5),
-                            ),
-                            child:
-                                Row(mainAxisSize: MainAxisSize.min, children: [
-                              const Icon(Icons.eco_rounded,
-                                  color: Color(0xFF7EEDB0), size: 15),
-                              const SizedBox(width: 6),
-                              Text('${level['label']} · Lv. ${level['level']}',
-                                  style: GoogleFonts.dmSans(
-                                      color: const Color(0xFF7EEDB0),
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600)),
-                            ]),
-                          ),
-                        ]),
+                          ]),
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(18, 20, 18, 40),
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                      // ── Stats ──────────────────────────────────────────
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4))
-                          ],
-                        ),
-                        child: Row(children: [
-                          _statItem('${_totalWeight.toStringAsFixed(1)} kg',
-                              'Recycled'),
-                          _divider(),
-                          _statItem(_co2Saved.toStringAsFixed(1), 'CO2 Saved'),
-                          _divider(),
-                          _statItem(_totalPoints.toString(), 'Points'),
-                        ]),
-                      ),
-
-                      const SizedBox(height: 28),
-
-                      // ── Account ────────────────────────────────────────
-                      _sectionLabel('Account'),
-                      const SizedBox(height: 10),
-                      _menuGroup([
-                        _MenuItem(
-                          icon: Icons.edit_outlined,
-                          iconColor: const Color(0xFFCC8A2E),
-                          emojiColor: const Color(0xFFFFF3E3),
-                          title: 'Edit Profile',
-                          onTap: _showEditUsernameSheet,
-                        ),
-                        _MenuItem(
-                          icon: Icons.notifications_none_rounded,
-                          iconColor: const Color(0xFF4A90D9),
-                          emojiColor: const Color(0xFFE8F0FA),
-                          title: 'Notifications',
-                          badge: _unreadCount > 0 ? _unreadCount : null,
-                          onTap: () => _openNotifications(),
-                        ),
-                        _MenuItem(
-                          icon: Icons.shield_outlined,
-                          iconColor: const Color(0xFFE8A020),
-                          emojiColor: const Color(0xFFFBF3E3),
-                          title: 'Privacy & Security',
-                          onTap: () => _showComingSoon('Privacy & Security'),
-                          isLast: true,
-                        ),
-                      ]),
-
-                      const SizedBox(height: 24),
-
-                      // ── Achievements ───────────────────────────────────
-                      _sectionLabel('Achievements'),
-                      const SizedBox(height: 10),
-                      _menuGroup([
-                        _MenuItem(
-                          icon: Icons.star_rounded,
-                          iconColor: const Color(0xFFE8A020),
-                          emojiColor: const Color(0xFFFFF3CD),
-                          title: 'Favourite Stations',
-                          subtitle: 'Your saved recycling spots',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const FavoriteStationsScreen()),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(18, 20, 18, 40),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        // ── Stats ──────────────────────────────────────────
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4))
+                            ],
                           ),
+                          child: Row(children: [
+                            _statItem('${_totalWeight.toStringAsFixed(1)} kg',
+                                'Recycled'),
+                            _divider(),
+                            _statItem(
+                                _co2Saved.toStringAsFixed(1), 'CO2 Saved'),
+                            _divider(),
+                            _statItem(_totalPoints.toString(), 'Points'),
+                          ]),
                         ),
-                        _MenuItem(
-                          icon: Icons.history_rounded,
-                          iconColor: const Color(0xFF3DAB6A),
-                          emojiColor: const Color(0xFFE8F5EE),
-                          title: 'Impact History',
-                          subtitle: 'Joined $joined',
-                          onTap: () => _showComingSoon('Impact History'),
-                          isLast: true,
-                        ),
-                      ]),
 
-                      const SizedBox(height: 24),
+                        const SizedBox(height: 28),
 
-                      // ── App ────────────────────────────────────────────
-                      _sectionLabel('App'),
-                      const SizedBox(height: 10),
-                      _menuGroup([
-                        _MenuItem(
-                          icon: Icons.star_border_rounded,
-                          iconColor: const Color(0xFFE8A020),
-                          emojiColor: const Color(0xFFFFF8E1),
-                          title: 'Rate the App',
-                          onTap: () => _showComingSoon('Rate the App'),
-                        ),
-                        _MenuItem(
-                          icon: Icons.info_outline_rounded,
-                          iconColor: const Color(0xFF4A90D9),
-                          emojiColor: const Color(0xFFE8F0FA),
-                          title: 'About GreenTrack',
-                          subtitle: 'Version 1.0.0',
-                          onTap: () => _showComingSoon('About'),
-                          isLast: true,
-                        ),
-                      ]),
-
-                      if (_isAdmin) ...[
-                        const SizedBox(height: 24),
-                        _sectionLabel('Administration'),
+                        // ── Account ────────────────────────────────────────
+                        _sectionLabel('Account'),
                         const SizedBox(height: 10),
                         _menuGroup([
                           _MenuItem(
-                            icon: Icons.admin_panel_settings_rounded,
-                            iconColor: const Color(0xFF2D7A4F),
-                            emojiColor: const Color(0xFFE8F5EE),
-                            title: 'Admin Control Center',
-                            subtitle: 'Manage users, records, and stations',
-                            onTap: _openAdminModule,
+                            icon: Icons.edit_outlined,
+                            iconColor: const Color(0xFFCC8A2E),
+                            emojiColor: const Color(0xFFFFF3E3),
+                            title: 'Edit Profile',
+                            onTap: _showEditProfileSheet,
+                          ),
+                          _MenuItem(
+                            icon: Icons.lock_outline_rounded,
+                            iconColor: const Color(0xFFE8A020),
+                            emojiColor: const Color(0xFFFBF3E3),
+                            title: 'Change Password',
+                            onTap: _showChangePasswordSheet,
+                          ),
+                          _MenuItem(
+                            icon: Icons.notifications_none_rounded,
+                            iconColor: const Color(0xFF4A90D9),
+                            emojiColor: const Color(0xFFE8F0FA),
+                            title: 'Notifications',
+                            badge: _unreadCount > 0 ? _unreadCount : null,
+                            onTap: () => _openNotifications(),
+                          ),
+                          _MenuItem(
+                            icon: Icons.shield_outlined,
+                            iconColor: const Color(0xFFE8A020),
+                            emojiColor: const Color(0xFFFBF3E3),
+                            title: 'Privacy & Security',
+                            onTap: () => _showComingSoon('Privacy & Security'),
                             isLast: true,
                           ),
                         ]),
-                      ],
 
-                      const SizedBox(height: 28),
+                        const SizedBox(height: 24),
 
-                      // ── Logout ─────────────────────────────────────────
-                      GestureDetector(
-                        onTap: _signOut,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF0F0),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                                color: const Color(0xFFFFD0D0), width: 1.5),
+                        // ── Achievements ───────────────────────────────────
+                        _sectionLabel('Achievements'),
+                        const SizedBox(height: 10),
+                        _menuGroup([
+                          _MenuItem(
+                            icon: Icons.star_rounded,
+                            iconColor: const Color(0xFFE8A020),
+                            emojiColor: const Color(0xFFFFF3CD),
+                            title: 'Favourite Stations',
+                            subtitle: 'Your saved recycling spots',
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const FavoriteStationsScreen()),
+                            ),
                           ),
-                          child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.logout_rounded,
-                                    color: Color(0xFFE05454), size: 18),
-                                const SizedBox(width: 8),
-                                Text('Logout',
-                                    style: GoogleFonts.dmSans(
-                                        color: const Color(0xFFE05454),
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600)),
-                              ]),
+                          _MenuItem(
+                            icon: Icons.history_rounded,
+                            iconColor: const Color(0xFF3DAB6A),
+                            emojiColor: const Color(0xFFE8F5EE),
+                            title: 'Impact History',
+                            subtitle: 'Joined $joined',
+                            onTap: () => _showComingSoon('Impact History'),
+                            isLast: true,
+                          ),
+                        ]),
+
+                        const SizedBox(height: 24),
+
+                        // ── App ────────────────────────────────────────────
+                        _sectionLabel('App'),
+                        const SizedBox(height: 10),
+                        _menuGroup([
+                          _MenuItem(
+                            icon: Icons.star_border_rounded,
+                            iconColor: const Color(0xFFE8A020),
+                            emojiColor: const Color(0xFFFFF8E1),
+                            title: 'Rate the App',
+                            onTap: () => _showComingSoon('Rate the App'),
+                          ),
+                          _MenuItem(
+                            icon: Icons.info_outline_rounded,
+                            iconColor: const Color(0xFF4A90D9),
+                            emojiColor: const Color(0xFFE8F0FA),
+                            title: 'About GreenTrack',
+                            subtitle: 'Version 1.0.0',
+                            onTap: () => _showComingSoon('About'),
+                            isLast: true,
+                          ),
+                        ]),
+
+                        if (_isAdmin) ...[
+                          const SizedBox(height: 24),
+                          _sectionLabel('Administration'),
+                          const SizedBox(height: 10),
+                          _menuGroup([
+                            _MenuItem(
+                              icon: Icons.admin_panel_settings_rounded,
+                              iconColor: const Color(0xFF2D7A4F),
+                              emojiColor: const Color(0xFFE8F5EE),
+                              title: 'Admin Control Center',
+                              subtitle: 'Manage users, records, and stations',
+                              onTap: _openAdminModule,
+                              isLast: true,
+                            ),
+                          ]),
+                        ],
+
+                        const SizedBox(height: 28),
+
+                        // ── Logout ─────────────────────────────────────────
+                        GestureDetector(
+                          onTap: _signOut,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF0F0),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                  color: const Color(0xFFFFD0D0), width: 1.5),
+                            ),
+                            child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.logout_rounded,
+                                      color: Color(0xFFE05454), size: 18),
+                                  const SizedBox(width: 8),
+                                  Text('Logout',
+                                      style: GoogleFonts.dmSans(
+                                          color: const Color(0xFFE05454),
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600)),
+                                ]),
+                          ),
                         ),
-                      ),
-                    ]),
+                      ]),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
     );
   }
@@ -491,7 +613,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: Colors.black.withOpacity(0.04),
               blurRadius: 10,
               offset: const Offset(0, 3))
         ],
@@ -499,20 +621,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(children: items),
     );
   }
-
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('$feature – coming soon!',
-          style: GoogleFonts.dmSans(color: Colors.white)),
-      backgroundColor: const Color(0xFF2D7A4F),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.all(16),
-    ));
-  }
 }
-
-// ─── Menu Item ────────────────────────────────────────────────────────────────
 
 class _MenuItem extends StatelessWidget {
   final IconData icon;
@@ -604,32 +713,111 @@ class _MenuItem extends StatelessWidget {
   }
 }
 
-// ─── Edit Username Sheet ──────────────────────────────────────────────────────
+class EditProfileSheet extends StatefulWidget {
+  final String currentUsername;
+  final String currentEmail;
 
-class _EditUsernameSheet extends StatefulWidget {
-  final TextEditingController controller;
-  const _EditUsernameSheet({required this.controller});
+  const EditProfileSheet({
+    super.key,
+    required this.currentUsername,
+    required this.currentEmail,
+  });
 
   @override
-  State<_EditUsernameSheet> createState() => _EditUsernameSheetState();
+  State<EditProfileSheet> createState() => _EditProfileSheetState();
 }
 
-class _EditUsernameSheetState extends State<_EditUsernameSheet> {
+class _EditProfileSheetState extends State<EditProfileSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _nameController;
+  late TextEditingController _emailController;
   bool _isSaving = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.currentUsername);
+    _emailController = TextEditingController(text: widget.currentEmail);
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
   Future<void> _save() async {
-    final name = widget.controller.text.trim();
-    if (name.isEmpty) return;
+    if (!_formKey.currentState!.validate()) return;
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+
     setState(() => _isSaving = true);
     try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
-      await _supabase
-          .from('profiles')
-          .update({'username': name}).eq('id', user.id);
-      if (mounted) Navigator.pop(context, true);
-    } catch (_) {
-      if (mounted) Navigator.pop(context, false);
+      if (name != widget.currentUsername) {
+        await _authService.updateUsername(name);
+      }
+
+      if (email != widget.currentEmail) {
+        await _authService.updateEmail(email);
+        if (mounted) {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.mark_email_read_outlined,
+                    color: Color(0xFF7EEDB0), size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Confirmation link sent to $email',
+                    style:
+                        GoogleFonts.dmSans(color: Colors.white, fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF1A4731), // 使用你 Header 的深綠色
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            margin: const EdgeInsets.fromLTRB(
+                20, 0, 20, 40), // 讓它浮起來更高一點，避開 BottomBar
+            duration: const Duration(seconds: 4),
+          ));
+        }
+      } else {
+        if (mounted) {
+          Navigator.pop(context, true);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded,
+                    color: Color(0xFF1A4731), size: 20),
+                const SizedBox(width: 12),
+                Text(
+                  'Profile updated successfully!',
+                  style: GoogleFonts.dmSans(
+                      color: const Color(0xFF1A4731),
+                      fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF7EEDB0), // 使用你等級標籤的亮綠色
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+          ));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: const Color(0xFFE05454),
+        ));
+      }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -646,7 +834,9 @@ class _EditUsernameSheetState extends State<_EditUsernameSheet> {
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Column(
+        child: Form(
+          key: _formKey,
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -659,37 +849,38 @@ class _EditUsernameSheetState extends State<_EditUsernameSheet> {
                         borderRadius: BorderRadius.circular(2))),
               ),
               const SizedBox(height: 20),
-              Text('Edit Username',
+              Text('Edit Profile',
                   style: GoogleFonts.dmSans(
                       color: const Color(0xFF1A4731),
                       fontSize: 18,
                       fontWeight: FontWeight.w700)),
               const SizedBox(height: 16),
-              TextField(
-                controller: widget.controller,
-                autofocus: true,
-                style: GoogleFonts.dmSans(
-                    color: const Color(0xFF1A4731), fontSize: 15),
-                decoration: InputDecoration(
-                  hintText: 'Enter your username',
-                  hintStyle: GoogleFonts.dmSans(color: Colors.grey.shade300),
-                  filled: true,
-                  fillColor: const Color(0xFFF7F9F8),
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        const BorderSide(color: Color(0xFF3DAB6A), width: 1.5),
-                  ),
-                  prefixIcon: const Icon(Icons.person_outline_rounded,
-                      color: Color(0xFF3DAB6A), size: 20),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                ),
+              _textField(
+                controller: _nameController,
+                label: 'Username',
+                icon: Icons.person_outline_rounded,
+                validator: (val) {
+                  if (val == null || val.isEmpty)
+                    return 'Please enter a username';
+                  if (val.length < 6) return 'At least 6 characters';
+                  final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(val);
+                  final hasDigit = RegExp(r'[0-9]').hasMatch(val);
+                  if (!hasLetter || !hasDigit)
+                    return 'Must contain letters and numbers';
+                  return null;
+                },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              _textField(
+                controller: _emailController,
+                label: 'Email Address',
+                icon: Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
+                validator: (val) => (val == null || !val.contains('@'))
+                    ? 'Invalid email'
+                    : null,
+              ),
+              const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -697,32 +888,425 @@ class _EditUsernameSheetState extends State<_EditUsernameSheet> {
                   onPressed: _isSaving ? null : _save,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2D7A4F),
-                    disabledBackgroundColor:
-                        const Color(0xFF2D7A4F).withValues(alpha: 0.5),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
-                    elevation: 0,
                   ),
                   child: _isSaving
                       ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2.5))
+                              color: Colors.white, strokeWidth: 2))
                       : Text('Save Changes',
                           style: GoogleFonts.dmSans(
                               color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15)),
+                              fontWeight: FontWeight.w600)),
                 ),
               ),
-            ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _textField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 15),
+      keyboardType: keyboardType,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.dmSans(color: Colors.grey.shade500),
+        filled: true,
+        fillColor: const Color(0xFFF7F9F8),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF3DAB6A), width: 1.5)),
+        prefixIcon: Icon(icon, color: const Color(0xFF3DAB6A), size: 20),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
     );
   }
 }
 
-// ─── Favourite Stations Screen ────────────────────────────────────────────────
+class ChangePasswordSheet extends StatefulWidget {
+  final String email;
+  const ChangePasswordSheet({super.key, required this.email});
+
+  @override
+  State<ChangePasswordSheet> createState() => _ChangePasswordSheetState();
+}
+
+class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _otpController = TextEditingController();
+  final _passController = TextEditingController();
+  final _confirmController = TextEditingController();
+
+  int _step = 1;
+  bool _isSaving = false;
+  int _resendCountdown = 0;
+  String? _localError;
+  Timer? _timer;
+
+  void _startCountdown() {
+    setState(() => _resendCountdown = 60);
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_resendCountdown > 0) {
+        if (mounted) setState(() => _resendCountdown--);
+      } else {
+        _timer?.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _otpController.dispose();
+    _passController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendOTP() async {
+    setState(() => _isSaving = true);
+    try {
+      await _supabase.auth.resetPasswordForEmail(widget.email);
+      if (mounted) {
+        setState(() => _step = 2);
+        _startCountdown();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text('8-digit code sent to registered address: ${widget.email}'),
+          backgroundColor: const Color(0xFF2D7A4F),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: const Color(0xFFE05454),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  void _showAppSnackBar(BuildContext context, String message,
+      {required bool isError, required IconData icon}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(
+        children: [
+          Icon(icon,
+              color: isError ? Colors.white : const Color(0xFF1A4731),
+              size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Text(message,
+                  style: GoogleFonts.dmSans(
+                      color: isError ? Colors.white : const Color(0xFF1A4731),
+                      fontWeight: FontWeight.w500))),
+        ],
+      ),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor:
+          isError ? const Color(0xFFE05454) : const Color(0xFF7EEDB0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+    ));
+  }
+
+  Future<void> _verifyAndSave() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSaving = true;
+      _localError = null;
+    });
+
+    try {
+      await _supabase.auth.verifyOTP(
+        email: widget.email,
+        token: _otpController.text.trim(),
+        type: OtpType.recovery,
+      );
+
+      await _authService.updatePassword(_passController.text.trim());
+
+      if (mounted) {
+        Navigator.pop(context);
+
+        _showAppSnackBar(context, 'Password updated successfully!',
+            isError: false, icon: Icons.lock_reset_rounded);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          // ❌ 失敗時，不 pop，直接把錯誤訊息寫進變數
+          _localError = 'Invalid or expired code';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(2))),
+                ),
+                const SizedBox(height: 20),
+                Text('Change Password',
+                    style: GoogleFonts.dmSans(
+                        color: const Color(0xFF1A4731),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Text(
+                    'A verification code will be sent to your registered email: ${widget.email}',
+                    style: GoogleFonts.dmSans(
+                        color: Colors.grey.shade600, fontSize: 13)),
+                const SizedBox(height: 20),
+                if (_step == 1) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _sendOTP,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2D7A4F),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2.5))
+                          : Text('Send Verification Code',
+                              style: GoogleFonts.dmSans(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15)),
+                    ),
+                  ),
+                ] else ...[
+                  Text('Enter the 8-digit code',
+                      style: GoogleFonts.dmSans(
+                          color: Colors.grey.shade600, fontSize: 13)),
+                  const SizedBox(height: 16),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: List.generate(8, (index) {
+                          bool isFilled = _otpController.text.length > index;
+                          return Container(
+                            width: 32,
+                            height: 45,
+                            decoration: BoxDecoration(
+                              color: isFilled
+                                  ? const Color(0xFF3DAB6A).withOpacity(0.1)
+                                  : const Color(0xFFF7F9F8),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: isFilled
+                                      ? const Color(0xFF3DAB6A)
+                                      : Colors.grey.shade200),
+                            ),
+                            child: Center(
+                              child: Text(
+                                isFilled ? _otpController.text[index] : "",
+                                style: const TextStyle(
+                                    color: Color(0xFF1A4731),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                      Opacity(
+                        opacity: 0,
+                        child: TextField(
+                          controller: _otpController,
+                          keyboardType: TextInputType.number,
+                          maxLength: 8,
+                          autofocus: true,
+                          readOnly: _isSaving,
+                          onChanged: (val) {
+                            setState(() {});
+                          },
+                          decoration: const InputDecoration(
+                            counterText: "",
+                            border: InputBorder.none,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  _passField(
+                    _passController,
+                    'New Password',
+                    validator: (val) {
+                      if (val == null || val.isEmpty)
+                        return 'Please enter a password';
+                      if (val.length < 6)
+                        return 'Password must be at least 6 characters';
+                      final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(val);
+                      final hasDigit = RegExp(r'[0-9]').hasMatch(val);
+                      final hasSymbol =
+                          RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(val);
+                      if (!hasLetter || !hasDigit || !hasSymbol) {
+                        return 'Must include letters, numbers, and symbols';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _passField(
+                    _confirmController,
+                    'Confirm New Password',
+                    validator: (val) => (val != _passController.text)
+                        ? 'Passwords do not match'
+                        : null,
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: _resendCountdown > 0 ? null : _sendOTP,
+                        child: Text(
+                          _resendCountdown > 0
+                              ? 'Resend in ${_resendCountdown}s'
+                              : 'Resend Code',
+                          style: GoogleFonts.dmSans(
+                              color: _resendCountdown > 0
+                                  ? Colors.grey
+                                  : const Color(0xFF3DAB6A),
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (_localError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline,
+                              color: Color(0xFFE05454), size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            _localError!,
+                            style: GoogleFonts.dmSans(
+                              color: const Color(0xFFE05454),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _verifyAndSave,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2D7A4F),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2.5))
+                          : Text('Verify & Update Password',
+                              style: GoogleFonts.dmSans(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15)),
+                    ),
+                  ),
+                ],
+              ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _passField(
+    TextEditingController controller,
+    String label, {
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: true,
+      style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 15),
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.dmSans(color: Colors.grey.shade500),
+        filled: true,
+        fillColor: const Color(0xFFF7F9F8),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none),
+        prefixIcon: const Icon(Icons.lock_outline_rounded,
+            color: Color(0xFF3DAB6A), size: 20),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      ),
+    );
+  }
+}
 
 class FavoriteStationsScreen extends StatefulWidget {
   const FavoriteStationsScreen({super.key});
@@ -741,8 +1325,6 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
     _loadFavorites();
   }
 
-  // ── Load from Supabase ────────────────────────────────────────────────────
-
   Future<void> _loadFavorites() async {
     setState(() => _isLoading = true);
     try {
@@ -755,7 +1337,6 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
         return;
       }
 
-      // Join favorite_stations with recycling_stations
       final rows = await supabaseClient
           .from('favorite_stations')
           .select('station_id, recycling_stations(*)')
@@ -797,17 +1378,14 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
         _isLoading = false;
       });
     } catch (_) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
-
-  // ── Remove from Supabase ──────────────────────────────────────────────────
 
   Future<void> _removeFavorite(String stationId) async {
     final userId = supabaseClient.auth.currentUser?.id;
     if (userId == null) return;
 
-    // Optimistic UI update
     setState(() => _favorites.removeWhere((c) => c.id == stationId));
 
     try {
@@ -817,12 +1395,11 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
           .eq('user_id', userId)
           .eq('station_id', stationId);
     } catch (_) {
-      // Reload on failure to restore correct state
       _loadFavorites();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Failed to remove. Please try again.',
-              style: GoogleFonts.dmSans(color: Colors.white)),
+          content: const Text('Failed to remove. Please try again.',
+              style: TextStyle(color: Colors.white)),
           backgroundColor: const Color(0xFFE05454),
           behavior: SnackBarBehavior.floating,
           shape:
@@ -839,7 +1416,6 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
       backgroundColor: const Color(0xFFF0F6F2),
       body: CustomScrollView(
         slivers: [
-          // ── App Bar ───────────────────────────────────────────────────
           SliverAppBar(
             expandedHeight: 120,
             pinned: true,
@@ -850,7 +1426,7 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
               child: Container(
                 margin: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.arrow_back_ios_new_rounded,
@@ -858,14 +1434,13 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
               ),
             ),
             actions: [
-              // Refresh button
               GestureDetector(
                 onTap: _loadFavorites,
                 child: Container(
                   margin: const EdgeInsets.fromLTRB(0, 8, 12, 8),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: Colors.white.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.refresh_rounded,
@@ -906,8 +1481,6 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
               ),
             ),
           ),
-
-          // ── Body ──────────────────────────────────────────────────────
           if (_isLoading)
             const SliverFillRemaining(
               child: Center(
@@ -937,25 +1510,10 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
                       style: GoogleFonts.dmSans(
                           color: Colors.grey.shade500, fontSize: 13),
                       textAlign: TextAlign.center),
-                  const SizedBox(height: 24),
-                  // Count badge
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5EE),
-                        borderRadius: BorderRadius.circular(20)),
-                    child: Text('0 stations saved',
-                        style: GoogleFonts.dmSans(
-                            color: const Color(0xFF3DAB6A),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600)),
-                  ),
                 ]),
               ),
             )
           else ...[
-            // Count header
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
@@ -981,7 +1539,6 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
                 ]),
               ),
             ),
-            // List
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               sliver: SliverList(
@@ -1004,8 +1561,6 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
   }
 }
 
-// ─── Favourite Card ───────────────────────────────────────────────────────────
-
 class _FavCard extends StatelessWidget {
   final RecyclingCenter center;
   final VoidCallback onRemove;
@@ -1021,7 +1576,7 @@ class _FavCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, 3))
         ],
@@ -1030,7 +1585,6 @@ class _FavCard extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.all(16),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Icon
             Container(
               width: 48,
               height: 48,
@@ -1041,8 +1595,6 @@ class _FavCard extends StatelessWidget {
                   color: Color(0xFFE8A020), size: 24),
             ),
             const SizedBox(width: 14),
-
-            // Info
             Expanded(
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1062,7 +1614,6 @@ class _FavCard extends StatelessWidget {
                     ],
                     const SizedBox(height: 8),
                     Row(children: [
-                      // Open/Closed
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
@@ -1091,36 +1642,9 @@ class _FavCard extends StatelessWidget {
                                   fontWeight: FontWeight.w600)),
                         ]),
                       ),
-                      if (center.phoneNumber != null) ...[
-                        const SizedBox(width: 6),
-                        GestureDetector(
-                          onTap: () =>
-                              launchUrl(Uri.parse('tel:${center.phoneNumber}')),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                                color: const Color(0xFFF0EBF9),
-                                borderRadius: BorderRadius.circular(8)),
-                            child:
-                                Row(mainAxisSize: MainAxisSize.min, children: [
-                              const Icon(Icons.phone_outlined,
-                                  color: Color(0xFF9B6FD4), size: 11),
-                              const SizedBox(width: 4),
-                              Text(center.phoneNumber!,
-                                  style: GoogleFonts.dmSans(
-                                      color: const Color(0xFF9B6FD4),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600)),
-                            ]),
-                          ),
-                        ),
-                      ],
                     ]),
                   ]),
             ),
-
-            // Remove star
             GestureDetector(
               onTap: () => _confirmRemove(context),
               child: Container(
@@ -1130,60 +1654,6 @@ class _FavCard extends StatelessWidget {
                     color: Color(0xFFFFF3CD), shape: BoxShape.circle),
                 child: const Icon(Icons.star_rounded,
                     color: Color(0xFFE8A020), size: 20),
-              ),
-            ),
-          ]),
-        ),
-
-        // Bottom action row
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F9F8),
-            borderRadius:
-                const BorderRadius.vertical(bottom: Radius.circular(18)),
-          ),
-          child: Row(children: [
-            // Navigate
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _openGoogleMaps(context),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.navigation_rounded,
-                            color: Color(0xFF2D7A4F), size: 14),
-                        const SizedBox(width: 6),
-                        Text('Navigate',
-                            style: GoogleFonts.dmSans(
-                                color: const Color(0xFF2D7A4F),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600)),
-                      ]),
-                ),
-              ),
-            ),
-            Container(width: 1, height: 20, color: Colors.grey.shade200),
-            // Remove
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _confirmRemove(context),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.star_outline_rounded,
-                            color: Color(0xFFE05454), size: 14),
-                        const SizedBox(width: 6),
-                        Text('Remove',
-                            style: GoogleFonts.dmSans(
-                                color: const Color(0xFFE05454),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600)),
-                      ]),
-                ),
               ),
             ),
           ]),
@@ -1228,20 +1698,11 @@ class _FavCard extends StatelessWidget {
       ),
     );
   }
-
-  Future<void> _openGoogleMaps(BuildContext context) async {
-    final uri = Uri.parse(
-        'https://www.google.com/maps/dir/?api=1&destination=${center.location.latitude},${center.location.longitude}&travelmode=driving');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
 }
-// ─── Notifications Sheet ──────────────────────────────────────────────────────
 
 class AppNotification {
   final String id;
-  final String type; // 'approved', 'rejected', 'points'
+  final String type;
   final String title;
   final String body;
   final bool isRead;
@@ -1305,7 +1766,6 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
           _isLoading = false;
         });
       }
-      // Mark all as read silently
       await _supabase
           .from('notifications')
           .update({'is_read': true})
@@ -1317,7 +1777,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
   }
 
   Future<void> _deleteOne(String id) async {
-    setState(() => _notifications.removeWhere((n) => n.id == id));
+    if (mounted) setState(() => _notifications.removeWhere((n) => n.id == id));
     await _supabase.from('notifications').delete().eq('id', id);
   }
 
@@ -1354,7 +1814,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
       ),
     );
     if (confirm != true) return;
-    setState(() => _notifications.clear());
+    if (mounted) setState(() => _notifications.clear());
     await _supabase.from('notifications').delete().eq('user_id', widget.userId);
   }
 
@@ -1407,7 +1867,6 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: Column(children: [
-        // ── Handle + Header ────────────────────────────────────────
         Container(
           decoration: const BoxDecoration(
             color: Colors.white,
@@ -1431,9 +1890,8 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8F0FA),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                      color: const Color(0xFFE8F0FA),
+                      borderRadius: BorderRadius.circular(12)),
                   child: const Icon(Icons.notifications_rounded,
                       color: Color(0xFF4A90D9), size: 20),
                 ),
@@ -1461,9 +1919,8 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 7),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF0F0),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                          color: const Color(0xFFFFF0F0),
+                          borderRadius: BorderRadius.circular(10)),
                       child: Text('Clear all',
                           style: GoogleFonts.dmSans(
                               color: const Color(0xFFE05454),
@@ -1475,8 +1932,6 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
             ),
           ]),
         ),
-
-        // ── Body ───────────────────────────────────────────────────
         Expanded(
           child: _isLoading
               ? const Center(
@@ -1499,12 +1954,6 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                                 color: const Color(0xFF1A4731),
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 6),
-                        Text(
-                            'You\'ll be notified when your\nrecords are approved or rejected.',
-                            style: GoogleFonts.dmSans(
-                                color: Colors.grey.shade400, fontSize: 13),
-                            textAlign: TextAlign.center),
                       ]),
                     )
                   : RefreshIndicator(
@@ -1524,9 +1973,8 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                               alignment: Alignment.centerRight,
                               padding: const EdgeInsets.only(right: 20),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE05454),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
+                                  color: const Color(0xFFE05454),
+                                  borderRadius: BorderRadius.circular(16)),
                               child: const Icon(Icons.delete_outline,
                                   color: Colors.white, size: 22),
                             ),
@@ -1538,16 +1986,9 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                                     ? Colors.white
                                     : const Color(0xFFF0F8FF),
                                 borderRadius: BorderRadius.circular(16),
-                                border: n.isRead
-                                    ? null
-                                    : Border.all(
-                                        color: const Color(0xFF4A90D9)
-                                            .withValues(alpha: 0.2),
-                                        width: 1.5),
                                 boxShadow: [
                                   BoxShadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.04),
+                                      color: Colors.black.withOpacity(0.04),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2))
                                 ],
@@ -1559,9 +2000,9 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                                       width: 42,
                                       height: 42,
                                       decoration: BoxDecoration(
-                                        color: cfg['bg'] as Color,
-                                        borderRadius: BorderRadius.circular(13),
-                                      ),
+                                          color: cfg['bg'] as Color,
+                                          borderRadius:
+                                              BorderRadius.circular(13)),
                                       child: Icon(cfg['icon'] as IconData,
                                           color: cfg['color'] as Color,
                                           size: 22),
@@ -1572,30 +2013,14 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            Row(children: [
-                                              Expanded(
-                                                child: Text(n.title,
-                                                    style: GoogleFonts.dmSans(
-                                                      color: const Color(
-                                                          0xFF1A4731),
-                                                      fontSize: 13,
-                                                      fontWeight: n.isRead
-                                                          ? FontWeight.w600
-                                                          : FontWeight.w700,
-                                                    )),
-                                              ),
-                                              if (!n.isRead)
-                                                Container(
-                                                  width: 8,
-                                                  height: 8,
-                                                  decoration:
-                                                      const BoxDecoration(
-                                                          color:
-                                                              Color(0xFF4A90D9),
-                                                          shape:
-                                                              BoxShape.circle),
-                                                ),
-                                            ]),
+                                            Text(n.title,
+                                                style: GoogleFonts.dmSans(
+                                                    color:
+                                                        const Color(0xFF1A4731),
+                                                    fontSize: 13,
+                                                    fontWeight: n.isRead
+                                                        ? FontWeight.w600
+                                                        : FontWeight.w700)),
                                             const SizedBox(height: 4),
                                             Text(n.body,
                                                 style: GoogleFonts.dmSans(
