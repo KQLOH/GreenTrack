@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'supabase_client.dart';
+import 'package:path/path.dart' as p;
 import 'dart:convert';
 
 class AuthService {

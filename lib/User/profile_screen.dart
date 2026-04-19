@@ -8,6 +8,7 @@ import '../admin/admin_module_screen.dart';
 import '../services/supabase_client.dart';
 import '../services/auth_service.dart';
 import 'recycle_map_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
 
@@ -53,7 +54,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       // 2. Fetch the profile from the database table
       final profile =
-          await _supabase.from('profiles').select().eq('id', user.id).single();
+      await _supabase.from('profiles').select().eq('id', user.id).single();
+
+      // 3. AUTO-SYNC: If Auth email (verified link) is different from Table, update table
+      if (user.email != null && profile['email'] != user.email) {
+        await _supabase.from('profiles').update({'email': user.email}).eq('id', user.id);
+        profile['email'] = user.email;
+      }
 
       // 3. AUTO-SYNC: If Auth email (verified link) is different from Table, update table
       if (user.email != null && profile['email'] != user.email) {
@@ -250,332 +257,338 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: const Color(0xFFF0F6F2),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF2D7A4F)))
+          child: CircularProgressIndicator(color: Color(0xFF2D7A4F)))
           : RefreshIndicator(
-              color: const Color(0xFF2D7A4F),
-              onRefresh: _loadData,
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  // ── Header ────────────────────────────────────────────────
-                  SliverToBoxAdapter(
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF1A4731), Color(0xFF2D7A4F)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                      child: SafeArea(
-                        bottom: false,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-                          child: Column(children: [
-                            Row(children: [
-                              const SizedBox(width: 38, height: 38),
-                              const Spacer(),
-                              Text('Profile',
-                                  style: GoogleFonts.dmSans(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600)),
-                              const Spacer(),
-                              GestureDetector(
-                                onTap: _showEditProfileSheet,
-                                child: Container(
-                                  width: 38,
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                        color: Colors.white.withOpacity(0.2)),
-                                  ),
-                                  child: const Icon(Icons.edit_outlined,
-                                      color: Colors.white, size: 17),
-                                ),
-                              ),
-                            ]),
-                            const SizedBox(height: 24),
-                            Stack(
-                              children: [
-                                GestureDetector(
-                                  onTap: _pickAndUploadAvatar,
-                                  child: Container(
-                                    width: 84,
-                                    height: 84,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF7EEDB0),
-                                      borderRadius: BorderRadius.circular(26),
-                                      image: avatarUrl != null
-                                          ? DecorationImage(
-                                              image: avatarUrl
-                                                      .startsWith('data:image')
-                                                  ? MemoryImage(base64Decode(
-                                                          avatarUrl
-                                                              .split(',')
-                                                              .last))
-                                                      as ImageProvider
-                                                  : NetworkImage(avatarUrl),
-                                              fit: BoxFit.cover,
-                                            )
-                                          : null,
-                                      boxShadow: [
-                                        BoxShadow(
-                                            color:
-                                                Colors.black.withOpacity(0.15),
-                                            blurRadius: 16,
-                                            offset: const Offset(0, 6))
-                                      ],
-                                    ),
-                                    child: avatarUrl == null
-                                        ? Center(
-                                            child: Text(
-                                              username.isNotEmpty
-                                                  ? username[0].toUpperCase()
-                                                  : 'U',
-                                              style: GoogleFonts.dmSerifDisplay(
-                                                  color:
-                                                      const Color(0xFF1A4731),
-                                                  fontSize: 34),
-                                            ),
-                                          )
-                                        : null,
-                                  ),
-                                ),
-                                Positioned(
-                                  right: -2,
-                                  bottom: -2,
-                                  child: GestureDetector(
-                                    onTap: _pickAndUploadAvatar,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(6),
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF3DAB6A),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                          Icons.camera_alt_rounded,
-                                          color: Colors.white,
-                                          size: 14),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(username,
-                                style: GoogleFonts.dmSerifDisplay(
-                                    color: Colors.white, fontSize: 22)),
-                            const SizedBox(height: 4),
-                            Text(email,
-                                style: GoogleFonts.dmSans(
-                                    color: Colors.white60, fontSize: 13)),
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 7),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2D7A4F),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                    color: const Color(0xFF7EEDB0)
-                                        .withOpacity(0.4),
-                                    width: 1.5),
-                              ),
-                              child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.eco_rounded,
-                                        color: Color(0xFF7EEDB0), size: 15),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                        '${level['label']} · Lv. ${level['level']}',
-                                        style: GoogleFonts.dmSans(
-                                            color: const Color(0xFF7EEDB0),
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600)),
-                                  ]),
-                            ),
-                          ]),
-                        ),
-                      ),
-                    ),
+        color: const Color(0xFF2D7A4F),
+        onRefresh: _loadData,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            // ── Header ────────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF1A4731), Color(0xFF2D7A4F)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(18, 20, 18, 40),
-                    sliver: SliverList(
-                      delegate: SliverChildListDelegate([
-                        // ── Stats ──────────────────────────────────────────
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4))
-                            ],
-                          ),
-                          child: Row(children: [
-                            _statItem('${_totalWeight.toStringAsFixed(1)} kg',
-                                'Recycled'),
-                            _divider(),
-                            _statItem(
-                                _co2Saved.toStringAsFixed(1), 'CO2 Saved'),
-                            _divider(),
-                            _statItem(_totalPoints.toString(), 'Points'),
-                          ]),
-                        ),
-
-                        const SizedBox(height: 28),
-
-                        // ── Account ────────────────────────────────────────
-                        _sectionLabel('Account'),
-                        const SizedBox(height: 10),
-                        _menuGroup([
-                          _MenuItem(
-                            icon: Icons.edit_outlined,
-                            iconColor: const Color(0xFFCC8A2E),
-                            emojiColor: const Color(0xFFFFF3E3),
-                            title: 'Edit Profile',
-                            onTap: _showEditProfileSheet,
-                          ),
-                          _MenuItem(
-                            icon: Icons.lock_outline_rounded,
-                            iconColor: const Color(0xFFE8A020),
-                            emojiColor: const Color(0xFFFBF3E3),
-                            title: 'Change Password',
-                            onTap: _showChangePasswordSheet,
-                          ),
-                          _MenuItem(
-                            icon: Icons.notifications_none_rounded,
-                            iconColor: const Color(0xFF4A90D9),
-                            emojiColor: const Color(0xFFE8F0FA),
-                            title: 'Notifications',
-                            badge: _unreadCount > 0 ? _unreadCount : null,
-                            onTap: () => _openNotifications(),
-                          ),
-                          _MenuItem(
-                            icon: Icons.shield_outlined,
-                            iconColor: const Color(0xFFE8A020),
-                            emojiColor: const Color(0xFFFBF3E3),
-                            title: 'Privacy & Security',
-                            onTap: () => _showComingSoon('Privacy & Security'),
-                            isLast: true,
-                          ),
-                        ]),
-
-                        const SizedBox(height: 24),
-
-                        // ── Achievements ───────────────────────────────────
-                        _sectionLabel('Achievements'),
-                        const SizedBox(height: 10),
-                        _menuGroup([
-                          _MenuItem(
-                            icon: Icons.star_rounded,
-                            iconColor: const Color(0xFFE8A020),
-                            emojiColor: const Color(0xFFFFF3CD),
-                            title: 'Favourite Stations',
-                            subtitle: 'Your saved recycling spots',
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                      const FavoriteStationsScreen()),
-                            ),
-                          ),
-                          _MenuItem(
-                            icon: Icons.history_rounded,
-                            iconColor: const Color(0xFF3DAB6A),
-                            emojiColor: const Color(0xFFE8F5EE),
-                            title: 'Impact History',
-                            subtitle: 'Joined $joined',
-                            onTap: () => _showComingSoon('Impact History'),
-                            isLast: true,
-                          ),
-                        ]),
-
-                        const SizedBox(height: 24),
-
-                        // ── App ────────────────────────────────────────────
-                        _sectionLabel('App'),
-                        const SizedBox(height: 10),
-                        _menuGroup([
-                          _MenuItem(
-                            icon: Icons.star_border_rounded,
-                            iconColor: const Color(0xFFE8A020),
-                            emojiColor: const Color(0xFFFFF8E1),
-                            title: 'Rate the App',
-                            onTap: () => _showComingSoon('Rate the App'),
-                          ),
-                          _MenuItem(
-                            icon: Icons.info_outline_rounded,
-                            iconColor: const Color(0xFF4A90D9),
-                            emojiColor: const Color(0xFFE8F0FA),
-                            title: 'About GreenTrack',
-                            subtitle: 'Version 1.0.0',
-                            onTap: () => _showComingSoon('About'),
-                            isLast: true,
-                          ),
-                        ]),
-
-                        if (_isAdmin) ...[
-                          const SizedBox(height: 24),
-                          _sectionLabel('Administration'),
-                          const SizedBox(height: 10),
-                          _menuGroup([
-                            _MenuItem(
-                              icon: Icons.admin_panel_settings_rounded,
-                              iconColor: const Color(0xFF2D7A4F),
-                              emojiColor: const Color(0xFFE8F5EE),
-                              title: 'Admin Control Center',
-                              subtitle: 'Manage users, records, and stations',
-                              onTap: _openAdminModule,
-                              isLast: true,
-                            ),
-                          ]),
-                        ],
-
-                        const SizedBox(height: 28),
-
-                        // ── Logout ─────────────────────────────────────────
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                    child: Column(children: [
+                      Row(children: [
                         GestureDetector(
-                          onTap: _signOut,
+                          onTap: () => Navigator.pop(context),
                           child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            width: 38,
+                            height: 38,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFF0F0),
-                              borderRadius: BorderRadius.circular(16),
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                  color: const Color(0xFFFFD0D0), width: 1.5),
+                                  color:
+                                  Colors.white.withOpacity(0.2)),
                             ),
-                            child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.logout_rounded,
-                                      color: Color(0xFFE05454), size: 18),
-                                  const SizedBox(width: 8),
-                                  Text('Logout',
-                                      style: GoogleFonts.dmSans(
-                                          color: const Color(0xFFE05454),
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600)),
-                                ]),
+                            child: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                color: Colors.white,
+                                size: 16),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text('Profile',
+                            style: GoogleFonts.dmSans(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600)),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: _showEditProfileSheet,
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color:
+                                  Colors.white.withOpacity(0.2)),
+                            ),
+                            child: const Icon(Icons.edit_outlined,
+                                color: Colors.white, size: 17),
                           ),
                         ),
                       ]),
-                    ),
+                      const SizedBox(height: 24),
+                      Stack(
+                        children: [
+                          GestureDetector(
+                            onTap: _pickAndUploadAvatar,
+                            child: Container(
+                              width: 84,
+                              height: 84,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF7EEDB0),
+                                borderRadius: BorderRadius.circular(26),
+                                image: avatarUrl != null
+                                    ? DecorationImage(
+                                  image: avatarUrl.startsWith('data:image')
+                                      ? MemoryImage(base64Decode(avatarUrl.split(',').last)) as ImageProvider
+                                      : NetworkImage(avatarUrl),
+                                  fit: BoxFit.cover,
+                                )
+                                    : null,
+                                boxShadow: [
+                                  BoxShadow(
+                                      color: Colors.black
+                                          .withOpacity(0.15),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 6))
+                                ],
+                              ),
+                              child: avatarUrl == null
+                                  ? Center(
+                                child: Text(
+                                  username.isNotEmpty
+                                      ? username[0].toUpperCase()
+                                      : 'U',
+                                  style: GoogleFonts.dmSerifDisplay(
+                                      color: const Color(0xFF1A4731),
+                                      fontSize: 34),
+                                ),
+                              )
+                                  : null,
+                            ),
+                          ),
+                          Positioned(
+                            right: -2,
+                            bottom: -2,
+                            child: GestureDetector(
+                              onTap: _pickAndUploadAvatar,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF3DAB6A),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.camera_alt_rounded,
+                                    color: Colors.white, size: 14),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(username,
+                          style: GoogleFonts.dmSerifDisplay(
+                              color: Colors.white, fontSize: 22)),
+                      const SizedBox(height: 4),
+                      Text(email,
+                          style: GoogleFonts.dmSans(
+                              color: Colors.white60, fontSize: 13)),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2D7A4F),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: const Color(0xFF7EEDB0)
+                                  .withOpacity(0.4),
+                              width: 1.5),
+                        ),
+                        child:
+                        Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.eco_rounded,
+                              color: Color(0xFF7EEDB0), size: 15),
+                          const SizedBox(width: 6),
+                          Text('${level['label']} · Lv. ${level['level']}',
+                              style: GoogleFonts.dmSans(
+                                  color: const Color(0xFF7EEDB0),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600)),
+                        ]),
+                      ),
+                    ]),
                   ),
-                ],
+                ),
               ),
             ),
+
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(18, 20, 18, 40),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // ── Stats ──────────────────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4))
+                      ],
+                    ),
+                    child: Row(children: [
+                      _statItem('${_totalWeight.toStringAsFixed(1)} kg',
+                          'Recycled'),
+                      _divider(),
+                      _statItem(_co2Saved.toStringAsFixed(1), 'CO2 Saved'),
+                      _divider(),
+                      _statItem(_totalPoints.toString(), 'Points'),
+                    ]),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // ── Account ────────────────────────────────────────
+                  _sectionLabel('Account'),
+                  const SizedBox(height: 10),
+                  _menuGroup([
+                    _MenuItem(
+                      icon: Icons.edit_outlined,
+                      iconColor: const Color(0xFFCC8A2E),
+                      emojiColor: const Color(0xFFFFF3E3),
+                      title: 'Edit Profile',
+                      onTap: _showEditProfileSheet,
+                    ),
+                    _MenuItem(
+                      icon: Icons.lock_outline_rounded,
+                      iconColor: const Color(0xFFE8A020),
+                      emojiColor: const Color(0xFFFBF3E3),
+                      title: 'Change Password',
+                      onTap: _showChangePasswordSheet,
+                    ),
+                    _MenuItem(
+                      icon: Icons.notifications_none_rounded,
+                      iconColor: const Color(0xFF4A90D9),
+                      emojiColor: const Color(0xFFE8F0FA),
+                      title: 'Notifications',
+                      badge: _unreadCount > 0 ? _unreadCount : null,
+                      onTap: () => _openNotifications(),
+                    ),
+                    _MenuItem(
+                      icon: Icons.shield_outlined,
+                      iconColor: const Color(0xFFE8A020),
+                      emojiColor: const Color(0xFFFBF3E3),
+                      title: 'Privacy & Security',
+                      onTap: () => _showComingSoon('Privacy & Security'),
+                      isLast: true,
+                    ),
+                  ]),
+
+                  const SizedBox(height: 24),
+
+                  // ── Achievements ───────────────────────────────────
+                  _sectionLabel('Achievements'),
+                  const SizedBox(height: 10),
+                  _menuGroup([
+                    _MenuItem(
+                      icon: Icons.star_rounded,
+                      iconColor: const Color(0xFFE8A020),
+                      emojiColor: const Color(0xFFFFF3CD),
+                      title: 'Favourite Stations',
+                      subtitle: 'Your saved recycling spots',
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const FavoriteStationsScreen()),
+                      ),
+                    ),
+                    _MenuItem(
+                      icon: Icons.history_rounded,
+                      iconColor: const Color(0xFF3DAB6A),
+                      emojiColor: const Color(0xFFE8F5EE),
+                      title: 'Impact History',
+                      subtitle: 'Joined $joined',
+                      onTap: () => _showComingSoon('Impact History'),
+                      isLast: true,
+                    ),
+                  ]),
+
+                  const SizedBox(height: 24),
+
+                  // ── App ────────────────────────────────────────────
+                  _sectionLabel('App'),
+                  const SizedBox(height: 10),
+                  _menuGroup([
+                    _MenuItem(
+                      icon: Icons.star_border_rounded,
+                      iconColor: const Color(0xFFE8A020),
+                      emojiColor: const Color(0xFFFFF8E1),
+                      title: 'Rate the App',
+                      onTap: () => _showComingSoon('Rate the App'),
+                    ),
+                    _MenuItem(
+                      icon: Icons.info_outline_rounded,
+                      iconColor: const Color(0xFF4A90D9),
+                      emojiColor: const Color(0xFFE8F0FA),
+                      title: 'About GreenTrack',
+                      subtitle: 'Version 1.0.0',
+                      onTap: () => _showComingSoon('About'),
+                      isLast: true,
+                    ),
+                  ]),
+
+                  if (_isAdmin) ...[
+                    const SizedBox(height: 24),
+                    _sectionLabel('Administration'),
+                    const SizedBox(height: 10),
+                    _menuGroup([
+                      _MenuItem(
+                        icon: Icons.admin_panel_settings_rounded,
+                        iconColor: const Color(0xFF2D7A4F),
+                        emojiColor: const Color(0xFFE8F5EE),
+                        title: 'Admin Control Center',
+                        subtitle: 'Manage users, records, and stations',
+                        onTap: _openAdminModule,
+                        isLast: true,
+                      ),
+                    ]),
+                  ],
+
+                  const SizedBox(height: 28),
+
+                  // ── Logout ─────────────────────────────────────────
+                  GestureDetector(
+                    onTap: _signOut,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF0F0),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                            color: const Color(0xFFFFD0D0), width: 1.5),
+                      ),
+                      child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.logout_rounded,
+                                color: Color(0xFFE05454), size: 18),
+                            const SizedBox(width: 8),
+                            Text('Logout',
+                                style: GoogleFonts.dmSans(
+                                    color: const Color(0xFFE05454),
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600)),
+                          ]),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -590,7 +603,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SizedBox(height: 2),
         Text(label,
             style:
-                GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 12)),
+            GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 12)),
       ]),
     );
   }
@@ -682,7 +695,7 @@ class _MenuItem extends StatelessWidget {
               if (badge != null) ...[
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
                     color: const Color(0xFFE05454),
                     borderRadius: BorderRadius.circular(10),
@@ -826,8 +839,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         decoration: const BoxDecoration(
@@ -892,7 +904,218 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                         borderRadius: BorderRadius.circular(14)),
                   ),
                   child: _isSaving
-                      ? const SizedBox(
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : Text('Save Changes', style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _textField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 15),
+      keyboardType: keyboardType,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.dmSans(color: Colors.grey.shade500),
+        filled: true,
+        fillColor: const Color(0xFFF7F9F8),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF3DAB6A), width: 1.5)),
+        prefixIcon: Icon(icon, color: const Color(0xFF3DAB6A), size: 20),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      ),
+    );
+  }
+}
+
+class ChangePasswordSheet extends StatefulWidget {
+  final String email;
+  const ChangePasswordSheet({super.key, required this.email});
+
+  @override
+  State<ChangePasswordSheet> createState() => _ChangePasswordSheetState();
+}
+
+class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _otpController = TextEditingController();
+  final _passController = TextEditingController();
+  final _confirmController = TextEditingController();
+
+  int _step = 1;
+  bool _isSaving = false;
+  int _resendCountdown = 0;
+  String? _localError;
+  Timer? _timer;
+
+  void _startCountdown() {
+    setState(() => _resendCountdown = 60);
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_resendCountdown > 0) {
+        if (mounted) setState(() => _resendCountdown--);
+      } else {
+        _timer?.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _otpController.dispose();
+    _passController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendOTP() async {
+    setState(() => _isSaving = true);
+    try {
+      await _supabase.auth.resetPasswordForEmail(widget.email);
+      if (mounted) {
+        setState(() => _step = 2);
+        _startCountdown();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('8-digit code sent to registered address: ${widget.email}'),
+          backgroundColor: const Color(0xFF2D7A4F),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: const Color(0xFFE05454),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+  void _showAppSnackBar(BuildContext context, String message, {required bool isError, required IconData icon}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(
+        children: [
+          Icon(icon, color: isError ? Colors.white : const Color(0xFF1A4731), size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Text(message,
+                  style: GoogleFonts.dmSans(
+                      color: isError ? Colors.white : const Color(0xFF1A4731),
+                      fontWeight: FontWeight.w500
+                  )
+              )
+          ),
+        ],
+      ),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: isError ? const Color(0xFFE05454) : const Color(0xFF7EEDB0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+    ));
+  }
+  Future<void> _verifyAndSave() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isSaving = true;
+      _localError = null;
+    });
+
+    try {
+      await _supabase.auth.verifyOTP(
+        email: widget.email,
+        token: _otpController.text.trim(),
+        type: OtpType.recovery,
+      );
+
+      await _authService.updatePassword(_passController.text.trim());
+
+      if (mounted) {
+        Navigator.pop(context);
+
+        _showAppSnackBar(
+            context,
+            'Password updated successfully!',
+            isError: false,
+            icon: Icons.lock_reset_rounded
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          // ❌ 失敗時，不 pop，直接把錯誤訊息寫進變數
+          _localError = 'Invalid or expired code';
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+      EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(2))),
+                ),
+                const SizedBox(height: 20),
+                Text('Change Password',
+                    style: GoogleFonts.dmSans(
+                        color: const Color(0xFF1A4731),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Text('A verification code will be sent to your registered email: ${widget.email}',
+                    style: GoogleFonts.dmSans(
+                        color: Colors.grey.shade600,
+                        fontSize: 13)),
+                const SizedBox(height: 20),
+
+                if (_step == 1) ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _sendOTP,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2D7A4F),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      child: _isSaving
+                          ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
@@ -939,7 +1162,6 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
       ),
     );
   }
-}
 
 class ChangePasswordSheet extends StatefulWidget {
   final String email;
@@ -1345,8 +1567,7 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
 
       final result = <RecyclingCenter>[];
       for (final row in rows as List) {
-        final station = row['recycling_stations'] as Map<String, dynamic>?;
-        if (station == null) continue;
+        final station = row['recycling_stations'] as Map<String, dynamic>?;        if (station == null) continue;
 
         double? toD(dynamic v) {
           if (v is num) return v.toDouble();
@@ -1369,7 +1590,7 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
           location: LatLng(lat, lng),
           phoneNumber: station['phone']?.toString(),
           isOpen:
-              station['is_open'] == null ? true : station['is_open'] == true,
+          station['is_open'] == null ? true : station['is_open'] == true,
         ));
       }
 
@@ -1403,7 +1624,7 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
           backgroundColor: const Color(0xFFE05454),
           behavior: SnackBarBehavior.floating,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ));
       }
@@ -1553,8 +1774,7 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
                   childCount: _favorites.length,
                 ),
               ),
-            ),
-          ],
+            ],
         ],
       ),
     );
@@ -1876,11 +2096,8 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
             const SizedBox(height: 12),
             Center(
               child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(2)),
+                width: 36, height: 4,
+                decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(2)),
               ),
             ),
             Padding(
@@ -1900,16 +2117,9 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Notifications',
-                            style: GoogleFonts.dmSans(
-                                color: const Color(0xFF1A4731),
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700)),
+                        Text('Notifications', style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 17, fontWeight: FontWeight.w700)),
                         if (!_isLoading)
-                          Text(
-                              '${_notifications.length} notification${_notifications.length != 1 ? 's' : ''}',
-                              style: GoogleFonts.dmSans(
-                                  color: Colors.grey.shade400, fontSize: 12)),
+                          Text('${_notifications.length} notification${_notifications.length != 1 ? 's' : ''}', style: GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 12)),
                       ]),
                 ),
                 if (_notifications.isNotEmpty)
@@ -1934,8 +2144,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
         ),
         Expanded(
           child: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: Color(0xFF3DAB6A)))
+              ? const Center(child: CircularProgressIndicator(color: Color(0xFF3DAB6A)))
               : _notifications.isEmpty
                   ? Center(
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -2042,6 +2251,28 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                         },
                       ),
                     ),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Container(
+                        width: 42, height: 42,
+                        decoration: BoxDecoration(color: cfg['bg'] as Color, borderRadius: BorderRadius.circular(13)),
+                        child: Icon(cfg['icon'] as IconData, color: cfg['color'] as Color, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(n.title, style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 13, fontWeight: n.isRead ? FontWeight.w600 : FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Text(n.body, style: GoogleFonts.dmSans(color: Colors.grey.shade500, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
+                          const SizedBox(height: 6),
+                          Text(_timeAgo(n.createdAt), style: GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 11)),
+                        ]),
+                      ),
+                    ]),
+                  ),
+                );
+              },
+            ),
+          ),
         ),
       ]),
     );

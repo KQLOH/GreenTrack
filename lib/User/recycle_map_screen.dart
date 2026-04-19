@@ -227,8 +227,9 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     // 檢查 GPS 服務是否開啟
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Please turn on your GPS Location service.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please turn on your GPS Location service.'))
+      );
       return false;
     }
 
@@ -256,8 +257,7 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Location Permission Required'),
-        content: const Text(
-            'We need location access to find nearby centers. Please enable it in settings.'),
+        content: const Text('We need location access to find nearby centers. Please enable it in settings.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
