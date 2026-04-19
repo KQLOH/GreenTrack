@@ -12,12 +12,18 @@ import '../services/supabase_client.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const _recycleTypes = [
-  _RecycleType('Plastic', Icons.water_drop_outlined, Color(0xFF3DAB6A), Color(0xFFE8F5EE)),
-  _RecycleType('Paper', Icons.article_outlined, Color(0xFF4A90D9), Color(0xFFE8F0FA)),
-  _RecycleType('Glass', Icons.wine_bar_outlined, Color(0xFF9B6FD4), Color(0xFFF0EBF9)),
-  _RecycleType('Metal', Icons.hardware_outlined, Color(0xFFE8A020), Color(0xFFFBF3E3)),
-  _RecycleType('E-Waste', Icons.devices_outlined, Color(0xFFE05454), Color(0xFFFFF0F0)),
-  _RecycleType('Clothes', Icons.checkroom_outlined, Color(0xFF00ACC1), Color(0xFFE0F7FA)),
+  _RecycleType('Plastic', Icons.water_drop_outlined, Color(0xFF3DAB6A),
+      Color(0xFFE8F5EE)),
+  _RecycleType(
+      'Paper', Icons.article_outlined, Color(0xFF4A90D9), Color(0xFFE8F0FA)),
+  _RecycleType(
+      'Glass', Icons.wine_bar_outlined, Color(0xFF9B6FD4), Color(0xFFF0EBF9)),
+  _RecycleType(
+      'Metal', Icons.hardware_outlined, Color(0xFFE8A020), Color(0xFFFBF3E3)),
+  _RecycleType(
+      'E-Waste', Icons.devices_outlined, Color(0xFFE05454), Color(0xFFFFF0F0)),
+  _RecycleType('Clothes', Icons.checkroom_outlined, Color(0xFF00ACC1),
+      Color(0xFFE0F7FA)),
 ];
 
 class _RecycleType {
@@ -36,6 +42,7 @@ class RecyclingCenter {
   final String address;
   final LatLng location;
   final double? rating;
+  final bool isActive;
   final bool isOpen;
   final String? phoneNumber;
   final List<String> openingHours;
@@ -48,6 +55,7 @@ class RecyclingCenter {
     required this.address,
     required this.location,
     this.rating,
+    this.isActive = true,
     this.isOpen = true,
     this.phoneNumber,
     this.openingHours = const [],
@@ -91,7 +99,8 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     _sheetAnim = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 350));
     _sheetSlide = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _sheetAnim, curve: Curves.easeOutCubic));
+        .animate(
+            CurvedAnimation(parent: _sheetAnim, curve: Curves.easeOutCubic));
     _loadFavoriteIds();
     _initLocation();
   }
@@ -163,7 +172,8 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
               style: GoogleFonts.dmSans(color: Colors.white)),
           backgroundColor: const Color(0xFFE05454),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.all(16),
         ));
       }
@@ -281,8 +291,12 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     final rows = List<Map<String, dynamic>>.from(data as List);
     final result = <RecyclingCenter>[];
     for (final row in rows) {
-      final lat = _toDouble(row['latitude']) ?? _toDouble(row['location_lat']) ?? _toDouble(row['lat']);
-      final lng = _toDouble(row['longitude']) ?? _toDouble(row['location_lng']) ?? _toDouble(row['lng']);
+      final lat = _toDouble(row['latitude']) ??
+          _toDouble(row['location_lat']) ??
+          _toDouble(row['lat']);
+      final lng = _toDouble(row['longitude']) ??
+          _toDouble(row['location_lng']) ??
+          _toDouble(row['lng']);
       if (lat == null || lng == null) continue;
       final name = (row['name'] ?? '').toString().trim();
       if (name.isEmpty) continue;
@@ -291,6 +305,7 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
         name: name,
         address: (row['address'] ?? '').toString(),
         location: LatLng(lat, lng),
+        isActive: row['is_active'] == false ? false : true,
         phoneNumber: row['phone']?.toString(),
         isOpen: row['is_open'] == null ? true : row['is_open'] == true,
       ));
@@ -306,13 +321,14 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
       _allCenters = [];
     }
     final withDistance = _allCenters.map((c) {
-      c.distanceKm = Geolocator.distanceBetween(
-          origin.latitude, origin.longitude,
-          c.location.latitude, c.location.longitude) / 1000;
+      c.distanceKm = Geolocator.distanceBetween(origin.latitude,
+              origin.longitude, c.location.latitude, c.location.longitude) /
+          1000;
       return c;
     }).toList()
       ..sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
-    final nearby = withDistance.where((c) => c.distanceKm <= _radiusKm).toList();
+    final nearby =
+        withDistance.where((c) => c.distanceKm <= _radiusKm).toList();
     final display = nearby.isEmpty ? withDistance.take(20).toList() : nearby;
     setState(() {
       _centers = display;
@@ -340,60 +356,110 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
-        padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 20),
+        padding: EdgeInsets.fromLTRB(
+            20, 16, 20, MediaQuery.of(context).padding.bottom + 20),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(
-            width: 36, height: 4,
-            decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(2)),
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(2)),
           ),
           const SizedBox(height: 20),
-          Text('Navigate to', style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 16, fontWeight: FontWeight.w700)),
+          Text('Navigate to',
+              style: GoogleFonts.dmSans(
+                  color: const Color(0xFF1A4731),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          Text(c.name, style: GoogleFonts.dmSans(color: Colors.grey.shade500, fontSize: 13), textAlign: TextAlign.center),
+          Text(c.name,
+              style:
+                  GoogleFonts.dmSans(color: Colors.grey.shade500, fontSize: 13),
+              textAlign: TextAlign.center),
           const SizedBox(height: 24),
-          _navTile(icon: Icons.map_rounded, title: 'Open in Google Maps', subtitle: 'Full turn-by-turn navigation',
-              color: const Color(0xFF4A90D9), bg: const Color(0xFFE8F0FA),
-              onTap: () { Navigator.pop(context); _openGoogleMaps(c); }),
+          _navTile(
+              icon: Icons.map_rounded,
+              title: 'Open in Google Maps',
+              subtitle: 'Full turn-by-turn navigation',
+              color: const Color(0xFF4A90D9),
+              bg: const Color(0xFFE8F0FA),
+              onTap: () {
+                Navigator.pop(context);
+                _openGoogleMaps(c);
+              }),
           const SizedBox(height: 12),
-          _navTile(icon: Icons.directions_rounded, title: 'Open in Waze', subtitle: 'Navigate with Waze',
-              color: const Color(0xFF3DAB6A), bg: const Color(0xFFE8F5EE),
-              onTap: () { Navigator.pop(context); _openWaze(c); }),
+          _navTile(
+              icon: Icons.directions_rounded,
+              title: 'Open in Waze',
+              subtitle: 'Navigate with Waze',
+              color: const Color(0xFF3DAB6A),
+              bg: const Color(0xFFE8F5EE),
+              onTap: () {
+                Navigator.pop(context);
+                _openWaze(c);
+              }),
         ]),
       ),
     );
   }
 
   Future<void> _openGoogleMaps(RecyclingCenter c) async {
-    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${c.location.latitude},${c.location.longitude}&travelmode=driving');
-    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final uri = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1&destination=${c.location.latitude},${c.location.longitude}&travelmode=driving');
+    if (await canLaunchUrl(uri))
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   Future<void> _openWaze(RecyclingCenter c) async {
-    final uri = Uri.parse('https://waze.com/ul?ll=${c.location.latitude},${c.location.longitude}&navigate=yes');
-    if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final uri = Uri.parse(
+        'https://waze.com/ul?ll=${c.location.latitude},${c.location.longitude}&navigate=yes');
+    if (await canLaunchUrl(uri))
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
-  Widget _navTile({required IconData icon, required String title, required String subtitle,
-    required Color color, required Color bg, required VoidCallback onTap}) {
+  Widget _navTile(
+      {required IconData icon,
+      required String title,
+      required String subtitle,
+      required Color color,
+      required Color bg,
+      required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.2), width: 1.5)),
+        decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(16),
+            border:
+                Border.all(color: color.withValues(alpha: 0.2), width: 1.5)),
         child: Row(children: [
-          Container(width: 44, height: 44,
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+          Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12)),
               child: Icon(icon, color: color, size: 22)),
           const SizedBox(width: 14),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontWeight: FontWeight.w700, fontSize: 14)),
-            Text(subtitle, style: GoogleFonts.dmSans(color: Colors.grey.shade500, fontSize: 12)),
-          ])),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(title,
+                    style: GoogleFonts.dmSans(
+                        color: const Color(0xFF1A4731),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14)),
+                Text(subtitle,
+                    style: GoogleFonts.dmSans(
+                        color: Colors.grey.shade500, fontSize: 12)),
+              ])),
           Icon(Icons.arrow_forward_ios_rounded, color: color, size: 14),
         ]),
       ),
@@ -423,53 +489,81 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
       options: MapOptions(
         initialCenter: center,
         initialZoom: 13.5,
-        onTap: (_, __) { if (_selectedCenter != null) _dismissSheet(); },
+        onTap: (_, __) {
+          if (_selectedCenter != null) _dismissSheet();
+        },
       ),
       children: [
-        TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
             userAgentPackageName: 'com.example.system_green_track'),
         MarkerLayer(markers: [
           if (_currentPosition != null)
-            Marker(point: _currentPosition!, width: 44, height: 44, child: _userMarker()),
+            Marker(
+                point: _currentPosition!,
+                width: 44,
+                height: 44,
+                child: _userMarker()),
           ..._centers.map((c) => Marker(
-            point: c.location, width: 44, height: 44,
-            child: GestureDetector(onTap: () => _selectCenter(c), child: _centerMarker(c)),
-          )),
+                point: c.location,
+                width: 44,
+                height: 44,
+                child: GestureDetector(
+                    onTap: () => _selectCenter(c), child: _centerMarker(c)),
+              )),
         ]),
       ],
     );
   }
 
   Widget _userMarker() => Container(
-    decoration: BoxDecoration(
-      color: const Color(0xFF4A90D9), shape: BoxShape.circle,
-      border: Border.all(color: Colors.white, width: 3),
-      boxShadow: [BoxShadow(color: const Color(0xFF4A90D9).withValues(alpha: 0.4), blurRadius: 10)],
-    ),
-    child: const Icon(Icons.person_pin_rounded, color: Colors.white, size: 22),
-  );
+        decoration: BoxDecoration(
+          color: const Color(0xFF4A90D9),
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 3),
+          boxShadow: [
+            BoxShadow(
+                color: const Color(0xFF4A90D9).withValues(alpha: 0.4),
+                blurRadius: 10)
+          ],
+        ),
+        child:
+            const Icon(Icons.person_pin_rounded, color: Colors.white, size: 22),
+      );
 
   Widget _centerMarker(RecyclingCenter c) {
     final isSelected = _selectedCenter?.id == c.id;
     final isFav = _favoriteIds.contains(c.id);
+    final markerColor =
+        c.isOpen ? const Color(0xFF3DAB6A) : const Color(0xFFE05454);
+    final markerIcon =
+        c.isOpen ? Icons.recycling_rounded : Icons.location_off_rounded;
     return Stack(clipBehavior: Clip.none, children: [
       AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          color: isFav ? const Color(0xFFE8A020) : isSelected ? const Color(0xFF1A4731) : const Color(0xFF3DAB6A),
+          color: markerColor,
           shape: BoxShape.circle,
           border: Border.all(color: Colors.white, width: 2.5),
-          boxShadow: [BoxShadow(
-              color: (isFav ? const Color(0xFFE8A020) : isSelected ? const Color(0xFF1A4731) : const Color(0xFF3DAB6A)).withValues(alpha: 0.45),
-              blurRadius: 10)],
+          boxShadow: [
+            BoxShadow(
+                color: markerColor.withValues(alpha: 0.45), blurRadius: 10)
+          ],
         ),
-        child: Icon(Icons.recycling_rounded, color: Colors.white, size: isSelected ? 22 : 18),
+        child:
+            Icon(markerIcon, color: Colors.white, size: isSelected ? 22 : 18),
       ),
       if (isFav)
-        Positioned(top: -4, right: -4,
-            child: Container(width: 16, height: 16,
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: const Icon(Icons.star_rounded, color: Color(0xFFE8A020), size: 12))),
+        Positioned(
+            top: -4,
+            right: -4,
+            child: Container(
+                width: 16,
+                height: 16,
+                decoration: const BoxDecoration(
+                    color: Colors.white, shape: BoxShape.circle),
+                child: const Icon(Icons.star_rounded,
+                    color: Color(0xFFE8A020), size: 12))),
     ]);
   }
 
@@ -478,53 +572,86 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: Row(children: [
-          _iconBtn(Icons.arrow_back_ios_new_rounded, onTap: () => Navigator.pop(context)),
-          const SizedBox(width: 12),
           Expanded(
             child: Container(
               height: 44,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(13),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.09), blurRadius: 8, offset: const Offset(0, 2))]),
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(13),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.09),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2))
+                  ]),
               child: Row(children: [
-                const Icon(Icons.recycling_rounded, color: Color(0xFF3DAB6A), size: 18),
+                const Icon(Icons.recycling_rounded,
+                    color: Color(0xFF3DAB6A), size: 18),
                 const SizedBox(width: 8),
                 Text('Nearby Recycling Centres',
-                    style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 13, fontWeight: FontWeight.w600)),
+                    style: GoogleFonts.dmSans(
+                        color: const Color(0xFF1A4731),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600)),
               ]),
             ),
           ),
           const SizedBox(width: 12),
-          _iconBtn(Icons.my_location_rounded, bg: const Color(0xFF3DAB6A), iconColor: Colors.white, onTap: _initLocation),
+          _iconBtn(Icons.my_location_rounded,
+              bg: const Color(0xFF3DAB6A),
+              iconColor: Colors.white,
+              onTap: _initLocation),
         ]),
       ),
     );
   }
 
-  Widget _iconBtn(IconData icon, {Color bg = Colors.white, Color iconColor = const Color(0xFF1A4731), required VoidCallback onTap}) {
+  Widget _iconBtn(IconData icon,
+      {Color bg = Colors.white,
+      Color iconColor = const Color(0xFF1A4731),
+      required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 44, height: 44,
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(13),
-            boxShadow: [BoxShadow(
-                color: bg == Colors.white ? Colors.black.withValues(alpha: 0.09) : bg.withValues(alpha: 0.4),
-                blurRadius: 8, offset: const Offset(0, 2))]),
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(13),
+            boxShadow: [
+              BoxShadow(
+                  color: bg == Colors.white
+                      ? Colors.black.withValues(alpha: 0.09)
+                      : bg.withValues(alpha: 0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2))
+            ]),
         child: Icon(icon, color: iconColor, size: 18),
       ),
     );
   }
 
   Widget _buildRadiusPills() {
-    const opts = [(l: '1 km', v: 1), (l: '3 km', v: 3), (l: '5 km', v: 5), (l: '10 km', v: 10)];
+    const opts = [
+      (l: '1 km', v: 1),
+      (l: '3 km', v: 3),
+      (l: '5 km', v: 5),
+      (l: '10 km', v: 10)
+    ];
     return Positioned(
-      top: MediaQuery.of(context).padding.top + 68, left: 16, right: 16,
+      top: MediaQuery.of(context).padding.top + 68,
+      left: 16,
+      right: 16,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: opts.map((o) {
           final sel = _radiusKm == o.v;
           return GestureDetector(
-            onTap: () { setState(() => _radiusKm = o.v); _loadCenters(); },
+            onTap: () {
+              setState(() => _radiusKm = o.v);
+              _loadCenters();
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               margin: const EdgeInsets.only(right: 8),
@@ -532,9 +659,17 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
               decoration: BoxDecoration(
                   color: sel ? const Color(0xFF2D7A4F) : Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 6, offset: const Offset(0, 2))]),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2))
+                  ]),
               child: Text(o.l,
-                  style: GoogleFonts.dmSans(color: sel ? Colors.white : const Color(0xFF1A4731), fontSize: 12, fontWeight: FontWeight.w600)),
+                  style: GoogleFonts.dmSans(
+                      color: sel ? Colors.white : const Color(0xFF1A4731),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600)),
             ),
           );
         }).toList(),
@@ -544,39 +679,61 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
 
   Widget _buildCountBadge() {
     return Positioned(
-      bottom: _selectedCenter != null ? 340 : 28, left: 16,
+      bottom: _selectedCenter != null ? 340 : 28,
+      left: 16,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.09), blurRadius: 8, offset: const Offset(0, 2))]),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.09),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2))
+            ]),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.location_on_rounded, color: Color(0xFF3DAB6A), size: 14),
+          const Icon(Icons.location_on_rounded,
+              color: Color(0xFF3DAB6A), size: 14),
           const SizedBox(width: 6),
-          Text('${_centers.length} centre${_centers.length != 1 ? 's' : ''} found',
-              style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+              '${_centers.length} centre${_centers.length != 1 ? 's' : ''} found',
+              style: GoogleFonts.dmSans(
+                  color: const Color(0xFF1A4731),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600)),
         ]),
       ),
     );
   }
 
   Widget _buildLoadingOverlay() => Positioned.fill(
-    child: Container(
-      color: Colors.white.withValues(alpha: 0.75),
-      child: Center(
         child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 20)]),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const CircularProgressIndicator(color: Color(0xFF3DAB6A)),
-            const SizedBox(height: 16),
-            Text('Loading map...', style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontWeight: FontWeight.w600)),
-          ]),
+          color: Colors.white.withValues(alpha: 0.75),
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.07),
+                        blurRadius: 20)
+                  ]),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const CircularProgressIndicator(color: Color(0xFF3DAB6A)),
+                const SizedBox(height: 16),
+                Text('Loading map...',
+                    style: GoogleFonts.dmSans(
+                        color: const Color(0xFF1A4731),
+                        fontWeight: FontWeight.w600)),
+              ]),
+            ),
+          ),
         ),
-      ),
-    ),
-  );
+      );
 
   // ── Detail Sheet ──────────────────────────────────────────────────────────
 
@@ -584,15 +741,21 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     final c = _selectedCenter!;
     final isFav = _favoriteIds.contains(c.id);
     return Positioned(
-      bottom: 0, left: 0, right: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
       child: SlideTransition(
         position: _sheetSlide,
         child: Container(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.65),
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.65),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 20, offset: Offset(0, -4))],
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black12, blurRadius: 20, offset: Offset(0, -4))
+            ],
           ),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             // Handle + ⭐ + close
@@ -601,8 +764,12 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
               child: Row(children: [
                 Expanded(
                   child: Center(
-                    child: Container(width: 36, height: 4,
-                        decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(2))),
+                    child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                            color: Colors.grey.shade200,
+                            borderRadius: BorderRadius.circular(2))),
                   ),
                 ),
                 // ⭐ Favourite button
@@ -610,28 +777,38 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
                   onTap: _favLoading ? null : () => _toggleFavorite(c.id),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    width: 36, height: 36,
+                    width: 36,
+                    height: 36,
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
-                      color: isFav ? const Color(0xFFFFF3CD) : Colors.grey.shade100,
+                      color: isFav
+                          ? const Color(0xFFFFF3CD)
+                          : Colors.grey.shade100,
                       shape: BoxShape.circle,
                     ),
                     child: _favLoading
                         ? const Padding(
-                        padding: EdgeInsets.all(8),
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFE8A020)))
+                            padding: EdgeInsets.all(8),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Color(0xFFE8A020)))
                         : Icon(
-                        isFav ? Icons.star_rounded : Icons.star_border_rounded,
-                        color: isFav ? const Color(0xFFE8A020) : Colors.grey,
-                        size: 20),
+                            isFav
+                                ? Icons.star_rounded
+                                : Icons.star_border_rounded,
+                            color:
+                                isFav ? const Color(0xFFE8A020) : Colors.grey,
+                            size: 20),
                   ),
                 ),
                 GestureDetector(
                   onTap: _dismissSheet,
                   child: Container(
-                    width: 28, height: 28,
-                    decoration: BoxDecoration(color: Colors.grey.shade100, shape: BoxShape.circle),
-                    child: const Icon(Icons.close_rounded, color: Colors.grey, size: 16),
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                        color: Colors.grey.shade100, shape: BoxShape.circle),
+                    child: const Icon(Icons.close_rounded,
+                        color: Colors.grey, size: 16),
                   ),
                 ),
               ]),
@@ -646,17 +823,24 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
 
             // Navigate button
             Padding(
-              padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 16),
+              padding: EdgeInsets.fromLTRB(
+                  20, 12, 20, MediaQuery.of(context).padding.bottom + 16),
               child: SizedBox(
-                width: double.infinity, height: 50,
+                width: double.infinity,
+                height: 50,
                 child: ElevatedButton.icon(
                   onPressed: () => _showNavOptions(c),
-                  icon: const Icon(Icons.navigation_rounded, color: Colors.white, size: 18),
+                  icon: const Icon(Icons.navigation_rounded,
+                      color: Colors.white, size: 18),
                   label: Text('Navigate',
-                      style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15)),
+                      style: GoogleFonts.dmSans(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15)),
                   style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2D7A4F),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
                       elevation: 0),
                 ),
               ),
@@ -669,25 +853,41 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
 
   Widget _buildSheetContent(RecyclingCenter c) {
     final isFav = _favoriteIds.contains(c.id);
+    final statusColor =
+        c.isActive ? const Color(0xFF3DAB6A) : const Color(0xFFE05454);
+    final statusBg =
+        c.isActive ? const Color(0xFFE8F5EE) : const Color(0xFFFFF0F0);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Container(
-          width: 48, height: 48,
-          decoration: BoxDecoration(color: const Color(0xFFE8F5EE), borderRadius: BorderRadius.circular(14)),
-          child: const Icon(Icons.recycling_rounded, color: Color(0xFF3DAB6A), size: 24),
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+              color: statusBg, borderRadius: BorderRadius.circular(14)),
+          child: Icon(Icons.recycling_rounded, color: statusColor, size: 24),
         ),
         const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(c.name, style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 16, fontWeight: FontWeight.w700)),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(c.name,
+              style: GoogleFonts.dmSans(
+                  color: const Color(0xFF1A4731),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          Text(c.address, style: GoogleFonts.dmSans(color: Colors.grey.shade500, fontSize: 12)),
+          Text(c.address,
+              style: GoogleFonts.dmSans(
+                  color: Colors.grey.shade500, fontSize: 12)),
         ])),
       ]),
       const SizedBox(height: 16),
-
       Wrap(spacing: 8, runSpacing: 8, children: [
-        _chip(Icons.straighten_rounded, '${c.distanceKm.toStringAsFixed(1)} km away',
-            const Color(0xFF4A90D9), const Color(0xFFE8F0FA)),
+        _chip(
+            Icons.straighten_rounded,
+            '${c.distanceKm.toStringAsFixed(1)} km away',
+            const Color(0xFF4A90D9),
+            const Color(0xFFE8F0FA)),
         if (c.rating != null)
           _chip(Icons.star_rounded, '${c.rating!.toStringAsFixed(1)} ★',
               const Color(0xFFE8A020), const Color(0xFFFBF3E3)),
@@ -696,6 +896,12 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
           c.isOpen ? 'Open now' : 'Closed',
           c.isOpen ? const Color(0xFF3DAB6A) : const Color(0xFFE05454),
           c.isOpen ? const Color(0xFFE8F5EE) : const Color(0xFFFFF0F0),
+        ),
+        _chip(
+          c.isActive ? Icons.toggle_on_rounded : Icons.toggle_off_rounded,
+          c.isActive ? 'Active' : 'Off',
+          c.isActive ? const Color(0xFF3DAB6A) : const Color(0xFFE05454),
+          c.isActive ? const Color(0xFFE8F5EE) : const Color(0xFFFFF0F0),
         ),
         if (c.phoneNumber != null)
           GestureDetector(
@@ -715,25 +921,29 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
             ),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(isFav ? Icons.star_rounded : Icons.star_border_rounded,
-                  color: isFav ? const Color(0xFFE8A020) : Colors.grey, size: 13),
+                  color: isFav ? const Color(0xFFE8A020) : Colors.grey,
+                  size: 13),
               const SizedBox(width: 4),
               Text(isFav ? 'Saved' : 'Save',
                   style: GoogleFonts.dmSans(
                       color: isFav ? const Color(0xFFE8A020) : Colors.grey,
-                      fontSize: 11, fontWeight: FontWeight.w600)),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600)),
             ]),
           ),
         ),
       ]),
-
       if (c.openingHours.isNotEmpty) ...[
         const SizedBox(height: 20),
         _sectionLabel(Icons.schedule_rounded, 'Opening Hours'),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: const Color(0xFFF7F9F8), borderRadius: BorderRadius.circular(12)),
-          child: Column(children: c.openingHours.map((line) {
+          decoration: BoxDecoration(
+              color: const Color(0xFFF7F9F8),
+              borderRadius: BorderRadius.circular(12)),
+          child: Column(
+              children: c.openingHours.map((line) {
             final parts = line.split(': ');
             final day = parts.isNotEmpty ? parts[0] : line;
             final hours = parts.length > 1 ? parts[1] : '';
@@ -741,65 +951,106 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
               child: Row(children: [
-                SizedBox(width: 92,
-                    child: Text(day, style: GoogleFonts.dmSans(
-                        color: today ? const Color(0xFF2D7A4F) : Colors.grey.shade600,
-                        fontSize: 12, fontWeight: today ? FontWeight.w700 : FontWeight.w400))),
-                Expanded(child: Text(hours, style: GoogleFonts.dmSans(
-                    color: today ? const Color(0xFF1A4731) : Colors.grey.shade500,
-                    fontSize: 12, fontWeight: today ? FontWeight.w600 : FontWeight.w400))),
+                SizedBox(
+                    width: 92,
+                    child: Text(day,
+                        style: GoogleFonts.dmSans(
+                            color: today
+                                ? const Color(0xFF2D7A4F)
+                                : Colors.grey.shade600,
+                            fontSize: 12,
+                            fontWeight:
+                                today ? FontWeight.w700 : FontWeight.w400))),
+                Expanded(
+                    child: Text(hours,
+                        style: GoogleFonts.dmSans(
+                            color: today
+                                ? const Color(0xFF1A4731)
+                                : Colors.grey.shade500,
+                            fontSize: 12,
+                            fontWeight:
+                                today ? FontWeight.w600 : FontWeight.w400))),
                 if (today)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(color: const Color(0xFF3DAB6A), borderRadius: BorderRadius.circular(6)),
-                    child: Text('Today', style: GoogleFonts.dmSans(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF3DAB6A),
+                        borderRadius: BorderRadius.circular(6)),
+                    child: Text('Today',
+                        style: GoogleFonts.dmSans(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700)),
                   ),
               ]),
             );
           }).toList()),
         ),
       ],
-
       if (c.acceptedTypes.isNotEmpty) ...[
         const SizedBox(height: 20),
         _sectionLabel(Icons.category_outlined, 'Accepted Materials'),
         const SizedBox(height: 10),
-        Wrap(spacing: 8, runSpacing: 8,
+        Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: _recycleTypes
                 .where((t) => c.acceptedTypes.contains(t.label))
                 .map((t) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: t.bg, borderRadius: BorderRadius.circular(10)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(t.icon, color: t.color, size: 13),
-                const SizedBox(width: 5),
-                Text(t.label, style: GoogleFonts.dmSans(color: t.color, fontSize: 11, fontWeight: FontWeight.w600)),
-              ]),
-            )).toList()),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                          color: t.bg, borderRadius: BorderRadius.circular(10)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(t.icon, color: t.color, size: 13),
+                        const SizedBox(width: 5),
+                        Text(t.label,
+                            style: GoogleFonts.dmSans(
+                                color: t.color,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600)),
+                      ]),
+                    ))
+                .toList()),
       ],
-
       const SizedBox(height: 24),
     ]);
   }
 
   Widget _sectionLabel(IconData icon, String label) => Row(children: [
-    Icon(icon, color: const Color(0xFF3DAB6A), size: 15),
-    const SizedBox(width: 6),
-    Text(label, style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 13, fontWeight: FontWeight.w700)),
-  ]);
+        Icon(icon, color: const Color(0xFF3DAB6A), size: 15),
+        const SizedBox(width: 6),
+        Text(label,
+            style: GoogleFonts.dmSans(
+                color: const Color(0xFF1A4731),
+                fontSize: 13,
+                fontWeight: FontWeight.w700)),
+      ]);
 
   Widget _chip(IconData icon, String label, Color color, Color bg) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, color: color, size: 13),
-      const SizedBox(width: 4),
-      Text(label, style: GoogleFonts.dmSans(color: color, fontSize: 11, fontWeight: FontWeight.w600)),
-    ]),
-  );
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, color: color, size: 13),
+          const SizedBox(width: 4),
+          Text(label,
+              style: GoogleFonts.dmSans(
+                  color: color, fontSize: 11, fontWeight: FontWeight.w600)),
+        ]),
+      );
 
   bool _isToday(String dayName) {
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
     return dayName.startsWith(days[DateTime.now().weekday - 1]);
   }
 }

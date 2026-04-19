@@ -1,6 +1,5 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'recycle_screen.dart';
 import '../services/supabase_client.dart';
 
 final supabase = supabaseClient;
@@ -641,7 +640,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       children: [
         _sectionTitle('Nearby Stations'),
         const SizedBox(height: 14),
-        ..._stations.map((s) => _stationTile(s)),
+        ..._stations.take(3).map((s) => _stationTile(s)),
       ],
     );
   }
@@ -832,22 +831,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          _sectionTitle('Recent Activity'),
-          const Spacer(),
-          GestureDetector(
-            onTap: () async {
-              await Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const RecycleScreen()));
-              _loadData();
-            },
-            child: Text('See all',
-                style: GoogleFonts.dmSans(
-                    color: const Color(0xFF3DAB6A),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
-          ),
-        ]),
+        _sectionTitle('Recent Activity'),
         const SizedBox(height: 14),
         Container(
           decoration: BoxDecoration(

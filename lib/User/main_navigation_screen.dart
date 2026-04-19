@@ -14,20 +14,24 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+  final List<int> _pageRefreshTokens = <int>[0, 0, 0, 0];
 
-  static const List<Widget> _pages = <Widget>[
-    DashboardScreen(),
-    RecyclePage(),
-    ExplorePage(),
-    ProfilePage(),
-  ];
+  List<Widget> _buildPages() {
+    return <Widget>[
+      DashboardScreen(key: ValueKey('dashboard-${_pageRefreshTokens[0]}')),
+      RecyclePage(key: ValueKey('recycle-${_pageRefreshTokens[1]}')),
+      ExplorePage(key: ValueKey('explore-${_pageRefreshTokens[2]}')),
+      ProfilePage(key: ValueKey('profile-${_pageRefreshTokens[3]}')),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
+    final pages = _buildPages();
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _pages,
+        children: pages,
       ),
       bottomNavigationBar: NavigationBar(
         backgroundColor: const Color(0xFF2D7A4F),
@@ -45,7 +49,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (int index) {
           setState(() {
-            _currentIndex = index;
+            if (_currentIndex == index) {
+              _pageRefreshTokens[index]++;
+            } else {
+              _currentIndex = index;
+            }
           });
         },
         destinations: const <NavigationDestination>[

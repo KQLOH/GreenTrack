@@ -922,7 +922,8 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
                     SwitchListTile.adaptive(
                       contentPadding: EdgeInsets.zero,
                       value: isActive,
-                      activeColor: _primary,
+                      activeThumbColor: _primary,
+                      activeTrackColor: _primary.withValues(alpha: 0.35),
                       title: Text(
                         'Reward is active',
                         style: GoogleFonts.dmSans(
@@ -1584,6 +1585,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
                                       }
 
                                       setState(() => _isSavingStation = true);
+                                      final navigator = Navigator.of(context);
                                       final ok = isEditing
                                           ? await _updateStation(
                                               station: editingStation,
@@ -1605,7 +1607,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
                                         _selectedStationPoint = selectedPoint;
                                         await _loadStations();
                                         if (!mounted) return;
-                                        Navigator.pop(context, true);
+                                        navigator.pop(true);
                                       } else {
                                         _showSnack(
                                           isEditing
@@ -1666,15 +1668,6 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       );
       setState(() {});
     }
-  }
-
-  int get _totalUsers => _users.length;
-  int get _totalRecords => _records.length;
-  double get _totalCarbonSaved {
-    final totalWeight = _records.fold<double>(0, (sum, item) {
-      return sum + ((item['weight_kg'] as num?)?.toDouble() ?? 0);
-    });
-    return totalWeight * 2.5;
   }
 
   @override
@@ -1906,223 +1899,6 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     );
   }
 
-  Widget _buildOverviewTab() {
-    return AdminDashboardTab(
-      users: _users,
-      records: _records,
-      pendingRecords: _pendingRecords,
-      stations: _stations,
-      onRefresh: _loadAllData,
-      onModerateRecord: _moderatePendingRecord,
-    );
-  }
-
-  Widget _buildUsersTab() {
-    return AdminUsersTab(
-      users: _filteredUsers,
-      totalUsers: _users.length,
-      totalAdmins: _users.where((user) {
-        final role = (user['role'] ?? '').toString().toLowerCase();
-        return role == 'admin' || user['is_admin'] == true;
-      }).length,
-      searchQuery: _userSearchQuery,
-      onSearchChanged: (value) {
-        setState(() => _userSearchQuery = value);
-      },
-      isUpdatingUser: _isUpdatingUser,
-      onToggleAdmin: _updateUserRole,
-      onEditUser: _openEditUserSheet,
-      onDeleteUser: _confirmDeleteUser,
-      onRefresh: _loadUsers,
-    );
-  }
-
-  Widget _buildRecordsTab() {
-    return AdminRecordsTab(
-      records: _filteredRecords,
-      totalRecords: _records.length,
-      searchQuery: _recordSearchQuery,
-      isSavingRecord: _isSavingRecord,
-      onSearchChanged: (value) {
-        setState(() => _recordSearchQuery = value);
-      },
-      onRefresh: _loadRecords,
-      onEditRecord: _openEditRecordSheet,
-      onDeleteRecord: _confirmDeleteRecord,
-    );
-  }
-
-  Widget _buildPendingSubmissionsTab() {
-    return _buildOverviewTab();
-  }
-
-  Widget _buildRewardsTab() {
-    return AdminRewardsTab(
-      rewards: _rewards,
-      totalRedemptions: _totalRedemptions,
-      rewardsLoadError: _rewardsLoadError,
-      isSavingReward: _isSavingReward,
-      onRefresh: _loadRewards,
-      onAddReward: () => _openRewardSheet(),
-      onEditReward: (reward) => _openRewardSheet(editingReward: reward),
-      onDeleteReward: _confirmDeleteReward,
-      onToggleReward: _toggleRewardStatus,
-    );
-  }
-
-  Widget _buildStationsTab() {
-    return AdminStationsTab(
-      stations: _stations,
-      stationsLoadError: _stationsLoadError,
-      selectedStationPoint: _selectedStationPoint,
-      isSavingStation: _isSavingStation,
-      mapController: _stationMapController,
-      onRefresh: _loadStations,
-      onAddStation: () => _openAddStationSheet(
-        initialPoint: _selectedStationPoint,
-      ),
-      onEditStation: (station) {
-        final point = _stationPointFromMap(station);
-        _openAddStationSheet(
-          initialPoint: point ?? _selectedStationPoint,
-          editingStation: station,
-        );
-      },
-      onDeleteStation: _confirmDeleteStation,
-      onToggleStationOpen: _toggleStationOpen,
-      onSelectStationPoint: (point) {
-        setState(() => _selectedStationPoint = point);
-      },
-      onPickStation: (station) {
-        _showSnack(
-          'Selected: ${station['name'] ?? 'Station'}',
-          isError: false,
-        );
-      },
-      stationPointFromMap: _stationPointFromMap,
-    );
-  }
-
-  Widget _sectionHeader({
-    required String title,
-    required String subtitle,
-    Widget? action,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.dmSans(
-                  color: _ink,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: GoogleFonts.dmSans(
-                  color: Colors.grey.shade600,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (action != null) action,
-      ],
-    );
-  }
-
-  Widget _statCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE3EEE6)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0E000000),
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: GoogleFonts.dmSans(
-              color: Colors.grey.shade600,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.dmSans(
-              color: _ink,
-              fontWeight: FontWeight.w700,
-              fontSize: 17,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _chip(
-    IconData icon,
-    String text,
-    Color bg,
-    Color fg,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: fg),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: GoogleFonts.dmSans(
-              color: fg,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildInputField({
     required TextEditingController controller,
     required String label,
@@ -2172,43 +1948,6 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _simpleSectionCard({
-    required String title,
-    required Widget child,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE3EEE6)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0E000000),
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: GoogleFonts.dmSans(
-              color: _ink,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          child,
-        ],
-      ),
     );
   }
 }
