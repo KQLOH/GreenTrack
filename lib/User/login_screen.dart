@@ -4,7 +4,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
-import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -59,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen>
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _isLoading = true;
-      _loginErrorMessage = null; // 每次點擊登錄時先清空之前的錯誤
+      _loginErrorMessage = null;
     });
 
     try {
@@ -67,10 +66,8 @@ class _LoginScreenState extends State<LoginScreen>
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      // 登錄成功後的邏輯...
-    } on AuthException {
+    } on AuthException catch (_) {
       setState(() {
-        // 這裡可以自定義顯示的文字，例如 "Invalid email or password"
         _loginErrorMessage = "Invalid email or password. Please try again.";
       });
     } catch (_) {
@@ -88,12 +85,13 @@ class _LoginScreenState extends State<LoginScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        constraints: const BoxConstraints.expand(),
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFF1A4731), // deep forest green
-              Color(0xFF2D7A4F), // mid green
-              Color(0xFF3DAB6A), // bright green
+              Color(0xFF1A4731),
+              Color(0xFF2D7A4F),
+              Color(0xFF3DAB6A),
             ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -178,16 +176,13 @@ class _LoginScreenState extends State<LoginScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // --- 新增：顯示在 EMAIL 字樣樓上的 Error Message ---
                             if (_loginErrorMessage != null)
                               Padding(
-                                padding: const EdgeInsets.only(
-                                    bottom: 16, left: 4), // 加一點左邊距對齊 Label
+                                padding:
+                                    const EdgeInsets.only(bottom: 16, left: 4),
                                 child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start, // 如果訊息很長可以對齊頂部
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // 亮紅色的圖標，起到警示作用
                                     const Icon(Icons.error_outline_rounded,
                                         color: Color(0xFFFF5252), size: 18),
                                     const SizedBox(width: 8),
@@ -195,17 +190,16 @@ class _LoginScreenState extends State<LoginScreen>
                                       child: Text(
                                         _loginErrorMessage!,
                                         style: GoogleFonts.dmSans(
-                                          color: Colors.white, // 依照你的要求使用純白色字
+                                          color: Colors.white,
                                           fontSize: 13,
                                           fontWeight: FontWeight.w500,
-                                          height: 1.4, // 增加行高，閱讀起來更舒服
+                                          height: 1.4,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                            // Email field
                             _GreenTextField(
                               label: 'EMAIL',
                               hint: 'your@email.com',
@@ -306,83 +300,6 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
 
                             const SizedBox(height: 20),
-
-                            // OR divider
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Divider(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.25)),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 14),
-                                  child: Text(
-                                    'or',
-                                    style: GoogleFonts.dmSans(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.5),
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Divider(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.25)),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 20),
-
-                            // Continue with Google
-                            SizedBox(
-                              width: double.infinity,
-                              height: 54,
-                              child: OutlinedButton(
-                                onPressed: () {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const HomeScreen(),
-                                    ),
-                                  );
-                                },
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(
-                                    color: Colors.white.withValues(alpha: 0.3),
-                                    width: 1.5,
-                                  ),
-                                  backgroundColor:
-                                      Colors.white.withValues(alpha: 0.08),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.person_outline_rounded,
-                                      color:
-                                          Colors.white.withValues(alpha: 0.8),
-                                      size: 22,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      'Continue as Guest',
-                                      style: GoogleFonts.dmSans(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -431,8 +348,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 }
-
-// â”€â”€â”€ Green-themed text field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class _GreenTextField extends StatefulWidget {
   final String label;
