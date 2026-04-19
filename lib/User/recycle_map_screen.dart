@@ -174,30 +174,95 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
 
   // ── Location ──────────────────────────────────────────────────────────────
 
+// 1. 修改初始化位置的方法
   Future<void> _initLocation() async {
     setState(() => _isLoading = true);
     try {
-      if (!await _requestPermission()) {
-        setState(() => _currentPosition = _melakaCenter);
+      // 請求權限
+      final hasPermission = await _requestPermission();
+
+      if (!hasPermission) {
+        // 如果權限被拒絕，使用預設地點（馬六甲）
+        setState(() {
+          _currentPosition = _melakaCenter;
+          _isLoading = false;
+        });
         await _loadCenters();
         return;
       }
+
+      // 權限通過，獲取位置
       final pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
-      setState(() => _currentPosition = LatLng(pos.latitude, pos.longitude));
-      _mapController.move(_currentPosition!, 13.5);
-      await _loadCenters();
-    } catch (_) {
-      setState(() => _currentPosition = _melakaCenter);
+
+      if (mounted) {
+        setState(() {
+          _currentPosition = LatLng(pos.latitude, pos.longitude);
+          _isLoading = false;
+        });
+        _mapController.move(_currentPosition!, 13.5);
+        await _loadCenters();
+      }
+    } catch (e) {
+      print("定位發生錯誤: $e");
+      setState(() {
+        _currentPosition = _melakaCenter;
+        _isLoading = false;
+      });
       await _loadCenters();
     }
   }
 
   Future<bool> _requestPermission() async {
-    if (!await Geolocator.isLocationServiceEnabled()) return false;
-    var perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-    return perm != LocationPermission.denied && perm != LocationPermission.deniedForever;
+    // 檢查 GPS 服務是否開啟
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please turn on your GPS Location service.'))
+      );
+      return false;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        return false;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        _showPermissionDialog();
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  void _showPermissionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Location Permission Required'),
+        content: const Text('We need location access to find nearby centers. Please enable it in settings.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Geolocator.openAppSettings(); // 開啟系統設定頁面
+              Navigator.pop(context);
+            },
+            child: const Text('Settings'),
+          ),
+        ],
+      ),
+    );
   }
 
   // ── Load Centers ──────────────────────────────────────────────────────────

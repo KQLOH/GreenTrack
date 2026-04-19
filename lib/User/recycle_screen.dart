@@ -140,7 +140,7 @@ const Map<String, Map<String, double>> stationCoordinates = {
   },
 };
 
-const double allowedDistanceInMeters = 100.0;
+const double allowedDistanceInMeters = 1000.0;
 
 class RecycleScreen extends StatefulWidget {
   const RecycleScreen({super.key});

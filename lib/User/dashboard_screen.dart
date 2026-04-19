@@ -74,7 +74,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
       final now = DateTime.now();
       final startOfWeek =
-          now.subtract(Duration(days: now.weekday - 1)); // Monday
+      now.subtract(Duration(days: now.weekday - 1)); // Monday
       final startOfMonth = DateTime(now.year, now.month, 1);
 
       double weeklyWeight = 0;
@@ -166,37 +166,37 @@ class _DashboardScreenState extends State<DashboardScreen>
       backgroundColor: const Color(0xFFF0F6F2),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF2D7A4F)))
+          child: CircularProgressIndicator(color: Color(0xFF2D7A4F)))
           : FadeTransition(
-              opacity: _fadeAnim,
-              child: RefreshIndicator(
-                color: const Color(0xFF2D7A4F),
-                onRefresh: _loadData,
-                child: CustomScrollView(
-                  slivers: [
-                    _buildSliverHeader(),
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(18, 20, 18, 100),
-                      sliver: SliverList(
-                        delegate: SliverChildListDelegate([
-                          _buildOverviewGrid(),
-                          const SizedBox(height: 24),
-                          _buildAnalyticsSection(),
-                          const SizedBox(height: 24),
-                          _buildMonthlyGoal(),
-                          const SizedBox(height: 24),
-                          _buildNearbyStations(),
-                          const SizedBox(height: 24),
-                          _buildCategoryBreakdown(),
-                          const SizedBox(height: 24),
-                          _buildRecentActivity(),
-                        ]),
-                      ),
-                    ),
-                  ],
+        opacity: _fadeAnim,
+        child: RefreshIndicator(
+          color: const Color(0xFF2D7A4F),
+          onRefresh: _loadData,
+          child: CustomScrollView(
+            slivers: [
+              _buildSliverHeader(),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(18, 20, 18, 100),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    _buildOverviewGrid(),
+                    const SizedBox(height: 24),
+                    _buildAnalyticsSection(),
+                    const SizedBox(height: 24),
+                    _buildMonthlyGoal(),
+                    const SizedBox(height: 24),
+                    _buildNearbyStations(),
+                    const SizedBox(height: 24),
+                    _buildCategoryBreakdown(),
+                    const SizedBox(height: 24),
+                    _buildRecentActivity(),
+                  ]),
                 ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await Navigator.push(context,
@@ -339,7 +339,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               iconBg: const Color(0xFFFBF3E3),
               label: 'GOAL',
               value:
-                  '${(_monthlyWeight / _monthlyGoal * 100).clamp(0, 100).toStringAsFixed(0)}%',
+              '${(_monthlyWeight / _monthlyGoal * 100).clamp(0, 100).toStringAsFixed(0)}%',
               sub: 'Monthly target',
             ),
           ),
@@ -364,7 +364,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               iconBg: const Color(0xFFFDE8F3),
               label: 'STATIONS',
               value:
-                  '${_stations.where((s) => s['open'] == true).length} nearby',
+              '${_stations.where((s) => s['open'] == true).length} nearby',
               sub: 'Open now',
               valueColor: const Color(0xFFE05499),
             ),
@@ -509,8 +509,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                             color: isToday
                                 ? const Color(0xFF2D7A4F)
                                 : val > 0
-                                    ? const Color(0xFF7EEDB0)
-                                    : Colors.grey.shade100,
+                                ? const Color(0xFF7EEDB0)
+                                : Colors.grey.shade100,
                             borderRadius: const BorderRadius.vertical(
                                 top: Radius.circular(6)),
                           ),
@@ -595,7 +595,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               minHeight: 10,
               backgroundColor: Colors.white.withValues(alpha: 0.15),
               valueColor:
-                  const AlwaysStoppedAnimation<Color>(Color(0xFF7EEDB0)),
+              const AlwaysStoppedAnimation<Color>(Color(0xFF7EEDB0)),
             ),
           ),
           const SizedBox(height: 10),
