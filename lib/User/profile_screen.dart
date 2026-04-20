@@ -313,10 +313,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 width: 38,
                                 height: 38,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.15),
+                                  color: Colors.white.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                   ),
                                 ),
                                 child: const Icon(
@@ -342,10 +342,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 width: 38,
                                 height: 38,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.15),
+                                  color: Colors.white.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                   ),
                                 ),
                                 child: const Icon(
@@ -387,7 +387,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   boxShadow: [
                                     BoxShadow(
                                       color:
-                                      Colors.black.withOpacity(0.15),
+                                      Colors.black.withValues(alpha: 0.15),
                                       blurRadius: 16,
                                       offset: const Offset(0, 6),
                                     ),
@@ -427,10 +427,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     size: 14,
                                   ),
                                 ),
-                                child: const Icon(
-                                    Icons.camera_alt_rounded,
-                                    color: Colors.white,
-                                    size: 14),
                               ),
                             ),
                           ],
@@ -462,7 +458,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: const Color(0xFF7EEDB0)
-                                  .withOpacity(0.4),
+                                  .withValues(alpha: 0.4),
                               width: 1.5,
                             ),
                           ),
@@ -507,7 +503,7 @@ delegate: SliverChildListDelegate(
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -623,117 +619,72 @@ delegate: SliverChildListDelegate(
           title: 'Rate the App',
           onTap: () => _showComingSoon('Rate the App'),
         ),
-                    ),
-                    const SizedBox(height: 24),
-                    _sectionLabel('Achievements'),
-                    const SizedBox(height: 10),
-                    _menuGroup(
-                      [
-                        _MenuItem(
-                          icon: Icons.star_rounded,
-                          iconColor: const Color(0xFFE8A020),
-                          emojiColor: const Color(0xFFFFF3CD),
-                          title: 'Favourite Stations',
-                          subtitle: 'Your saved recycling spots',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                              const FavoriteStationsScreen(),
-                            ),
-                          ),
-                        ),
-                        _MenuItem(
-                          icon: Icons.history_rounded,
-                          iconColor: const Color(0xFF3DAB6A),
-                          emojiColor: const Color(0xFFE8F5EE),
-                          title: 'Impact History',
-                          subtitle: 'Joined $joined',
-                          onTap: () => _showComingSoon('Impact History'),
-                          isLast: true,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    _sectionLabel('App'),
-                    const SizedBox(height: 10),
-                    _menuGroup(
-                      [
-                        _MenuItem(
-                          icon: Icons.star_border_rounded,
-                          iconColor: const Color(0xFFE8A020),
-                          emojiColor: const Color(0xFFFFF8E1),
-                          title: 'Rate the App',
-                          onTap: () => _showComingSoon('Rate the App'),
-                        ),
-                        _MenuItem(
-                          icon: Icons.info_outline_rounded,
-                          iconColor: const Color(0xFF4A90D9),
-                          emojiColor: const Color(0xFFE8F0FA),
-                          title: 'About GreenTrack',
-                          subtitle: 'Version 1.0.0',
-                          onTap: () => _showComingSoon('About'),
-                          isLast: true,
-                        ),
-                      ],
-                    ),
-                    if (_isAdmin) ...[
-                      const SizedBox(height: 24),
-                      _sectionLabel('Administration'),
-                      const SizedBox(height: 10),
-                      _menuGroup(
-                        [
-                          _MenuItem(
-                            icon: Icons.admin_panel_settings_rounded,
-                            iconColor: const Color(0xFF2D7A4F),
-                            emojiColor: const Color(0xFFE8F5EE),
-                            title: 'Admin Control Center',
-                            subtitle:
-                            'Manage users, records, and stations',
-                            onTap: _openAdminModule,
-                            isLast: true,
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 28),
-                    GestureDetector(
-                      onTap: _signOut,
-                      child: Container(
-                        width: double.infinity,
-                        padding:
-                        const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF0F0),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: const Color(0xFFFFD0D0),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.logout_rounded,
-                              color: Color(0xFFE05454),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Logout',
-                              style: GoogleFonts.dmSans(
-                                color: const Color(0xFFE05454),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+        _MenuItem(
+          icon: Icons.info_outline_rounded,
+          iconColor: const Color(0xFF4A90D9),
+          emojiColor: const Color(0xFFE8F0FA),
+          title: 'About GreenTrack',
+          subtitle: 'Version 1.0.0',
+          onTap: () => _showComingSoon('About'),
+          isLast: true,
+        ),
+      ],
+    ),
+    if (_isAdmin) ...[
+      const SizedBox(height: 24),
+      _sectionLabel('Administration'),
+      const SizedBox(height: 10),
+      _menuGroup(
+        [
+          _MenuItem(
+            icon: Icons.admin_panel_settings_rounded,
+            iconColor: const Color(0xFF2D7A4F),
+            emojiColor: const Color(0xFFE8F5EE),
+            title: 'Admin Control Center',
+            subtitle: 'Manage users, records, and stations',
+            onTap: _openAdminModule,
+            isLast: true,
+          ),
+        ],
+      ),
+    ],
+    const SizedBox(height: 28),
+    GestureDetector(
+      onTap: _signOut,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF0F0),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFFFFD0D0),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.logout_rounded,
+              color: Color(0xFFE05454),
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Logout',
+              style: GoogleFonts.dmSans(
+                color: const Color(0xFFE05454),
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  ],
+),
               ),
             ),
           ],
@@ -788,7 +739,7 @@ delegate: SliverChildListDelegate(
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -957,17 +908,14 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         await _authService.updateEmail(email);
         if (mounted) {
           Navigator.pop(context, true);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.mark_email_read_outlined,
-                    color: Color(0xFF7EEDB0), size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Confirmation link sent to $email',
-                    style:
-                    GoogleFonts.dmSans(color: Colors.white, fontSize: 14),
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(
+                    Icons.mark_email_read_outlined,
+                    color: Color(0xFF7EEDB0),
+                    size: 20,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -989,14 +937,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
               duration: const Duration(seconds: 4),
             ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: const Color(0xFF1A4731), // 使用你 Header 的深綠色
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            margin: const EdgeInsets.fromLTRB(
-                20, 0, 20, 40), // 讓它浮起來更高一點，避開 BottomBar
-            duration: const Duration(seconds: 4),
-          ));
+          );
         }
       } else {
         if (mounted) {
@@ -1027,12 +968,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               ),
               margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
             ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: const Color(0xFF7EEDB0), // 使用你等級標籤的亮綠色
-            shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-          ));
+          );
         }
       }
     } catch (e) {
@@ -1433,7 +1369,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
                           height: 45,
                           decoration: BoxDecoration(
                             color: isFilled
-                                ? const Color(0xFF3DAB6A).withOpacity(0.1)
+                                ? const Color(0xFF3DAB6A).withValues(alpha: 0.1)
                                 : const Color(0xFFF7F9F8),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
@@ -1952,7 +1888,7 @@ class _FavCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -2474,7 +2410,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
