@@ -2,10 +2,9 @@
 import 'package:google_fonts/google_fonts.dart';
 import '../services/supabase_client.dart';
 import 'recycle_screen.dart';
+import 'rewards_screen.dart';
 
 final supabase = supabaseClient;
-
-// â”€â”€â”€ Dashboard Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -61,6 +60,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       final profile = await supabase
           .from('profiles')
           .select('username, monthly_goal_kg')
+          .select('username, total_points')
           .eq('id', user.id)
           .single();
 
@@ -78,7 +78,6 @@ class _DashboardScreenState extends State<DashboardScreen>
 
       double weeklyWeight = 0;
       double monthlyWeight = 0;
-      int totalPoints = 0;
       final List<double> weeklyBars = List.filled(7, 0);
       final Map<String, double> catBreakdown = {};
       final List<Map<String, dynamic>> stations = [];
@@ -92,7 +91,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         final points = (r['points'] as num?)?.toInt() ?? 0;
         final category = (r['category'] ?? '').toString();
 
-        totalPoints += points;
         catBreakdown[category] = (catBreakdown[category] ?? 0) + weight;
 
         if (!date.isBefore(startOfMonth)) {
@@ -140,10 +138,10 @@ class _DashboardScreenState extends State<DashboardScreen>
           _username = profile['username'] ?? 'User';
           _monthlyGoal =
               ((profile['monthly_goal_kg'] as num?)?.toDouble()) ?? 25.0;
+          _totalPoints = (profile['total_points'] as num?)?.toInt() ?? 0;
           _weeklyWeight = weeklyWeight;
           _monthlyWeight = monthlyWeight;
           _co2Saved = co2;
-          _totalPoints = totalPoints;
           _weeklyBarData = weeklyBars;
           _categoryBreakdown = catBreakdown;
           _stations = stations;
@@ -261,26 +259,48 @@ class _DashboardScreenState extends State<DashboardScreen>
                           ],
                         ),
                       ),
-                      // Points badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.2)),
-                        ),
-                        child: Row(children: [
-                          const Icon(Icons.star_rounded,
-                              color: Color(0xFFFFD700), size: 16),
-                          const SizedBox(width: 5),
-                          Text('$_totalPoints pts',
-                              style: GoogleFonts.dmSans(
+
+                      GestureDetector(
+                        // 1. 這裡必須加上 async
+                        onTap: () async {
+                          // 2. 這裡加上 await，並用 updatedPoints 接收傳回值
+                          final updatedPoints = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => RewardsScreen(currentPoints: _totalPoints),
+                            ),
+                          );
+
+                          // 3. 判斷是否有回傳值，有的話才更新 UI
+                          if (updatedPoints != null && mounted) {
+                            setState(() {
+                              _totalPoints = updatedPoints;
+                            });
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min, // 建議加上這個，防止 Container 撐太開
+                            children: [
+                              const Icon(Icons.star_rounded, color: Color(0xFFFFD700), size: 16),
+                              const SizedBox(width: 5),
+                              Text(
+                                '$_totalPoints pts',
+                                style: GoogleFonts.dmSans(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 13)),
-                        ]),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 10),
                       // Avatar
@@ -609,8 +629,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // â”€â”€ Nearby Stations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
   Widget _buildNearbyStations() {
     if (_stations.isEmpty) {
       return Column(
@@ -709,8 +727,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // â”€â”€ Category Breakdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
   Widget _buildCategoryBreakdown() {
     if (_categoryBreakdown.isEmpty) return const SizedBox.shrink();
 
@@ -805,8 +821,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     );
   }
-
-  // â”€â”€ Recent Activity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildRecentActivity() {
     if (_recentActivity.isEmpty) return const SizedBox.shrink();
@@ -929,8 +943,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       ],
     );
   }
-
-  // â”€â”€ Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _sectionTitle(String title) {
     return Text(title,

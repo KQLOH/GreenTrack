@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,6 +16,8 @@ import '../services/supabase_client.dart';
 import 'recycle_map_screen.dart';
 import 'impact_history_screen.dart';
 import 'about_greentrack_screen.dart';
+import 'redemption_history_screen.dart';
+
 final _supabase = supabaseClient;
 final _authService = AuthService();
 
@@ -60,6 +62,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final profile =
       await _supabase.from('profiles').select().eq('id', user.id).single();
 
+      // 3. AUTO-SYNC: If Auth email (verified link) is different from Table, update table
       if (user.email != null && profile['email'] != user.email) {
         await _supabase
             .from('profiles')
@@ -384,7 +387,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   borderRadius:
                                   BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                   ),
                                 ),
                                 child: const Icon(
@@ -414,7 +417,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   borderRadius:
                                   BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                   ),
                                 ),
                                 child: const Icon(
@@ -457,7 +460,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   boxShadow: [
                                     BoxShadow(
                                       color:
-                                      Colors.black.withOpacity(0.15),
+                                      Colors.black.withValues(alpha: 0.15),
                                       blurRadius: 16,
                                       offset: const Offset(0, 6),
                                     ),
@@ -528,7 +531,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
                               color: const Color(0xFF7EEDB0)
-                                  .withOpacity(0.4),
+                                  .withValues(alpha: 0.4),
                               width: 1.5,
                             ),
                           ),
@@ -561,274 +564,307 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(18, 20, 18, 40),
               sliver: SliverList(
-                delegate: SliverChildListDelegate(
-                  [
-                    // Stats row
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 20,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          _statItem(
-                            '${_totalWeight.toStringAsFixed(1)} kg',
-                            'Recycled',
-                          ),
-                          _divider(),
-                          _statItem(
-                            _co2Saved.toStringAsFixed(1),
-                            'CO2 Saved',
-                          ),
-                          _divider(),
-                          _statItem(
-                            _totalPoints.toString(),
-                            'Points',
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 28),
+delegate: SliverChildListDelegate(
+  [
+    // Stats row
+    Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 24,
+        vertical: 20,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _statItem(
+            '${_totalWeight.toStringAsFixed(1)} kg',
+            'Recycled',
+          ),
+          _divider(),
+          _statItem(
+            _co2Saved.toStringAsFixed(1),
+            'CO2 Saved',
+          ),
+          _divider(),
+          _statItem(
+            _totalPoints.toString(),
+            'Points',
+          ),
+        ],
+      ),
+    ),
+    const SizedBox(height: 28),
 
-                    // ── Monthly Goal Card ─────────────────────────
-                    _sectionLabel('Monthly Goal'),
-                    const SizedBox(height: 10),
-                    GestureDetector(
-                      onTap: _showMonthlyGoalSheet,
-                      child: Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE8F5EE),
-                                borderRadius: BorderRadius.circular(13),
-                              ),
-                              child: const Icon(
-                                Icons.flag_rounded,
-                                color: Color(0xFF3DAB6A),
-                                size: 22,
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Monthly Recycling Goal',
-                                    style: GoogleFonts.dmSans(
-                                      color: const Color(0xFF1A4731),
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    'Tap to update your target',
-                                    style: GoogleFonts.dmSans(
-                                      color: Colors.grey.shade400,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Current goal badge
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE8F5EE),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: const Color(0xFF3DAB6A)
-                                      .withOpacity(0.3),
-                                  width: 1.2,
-                                ),
-                              ),
-                              child: Text(
-                                '${monthlyGoal % 1 == 0 ? monthlyGoal.toInt() : monthlyGoal.toStringAsFixed(1)} kg',
-                                style: GoogleFonts.dmSans(
-                                  color: const Color(0xFF2D7A4F),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: Colors.grey.shade300,
-                              size: 20,
-                            ),
-                          ],
-                        ),
-                      ),
+    // Monthly Goal
+    _sectionLabel('Monthly Goal'),
+    const SizedBox(height: 10),
+    GestureDetector(
+      onTap: _showMonthlyGoalSheet,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5EE),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: const Icon(
+                Icons.flag_rounded,
+                color: Color(0xFF3DAB6A),
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Monthly Recycling Goal',
+                    style: GoogleFonts.dmSans(
+                      color: const Color(0xFF1A4731),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                     ),
-
-                    const SizedBox(height: 28),
-                    _sectionLabel('Account'),
-                    const SizedBox(height: 10),
-                    _menuGroup(
-                      [
-                        _MenuItem(
-                          icon: Icons.edit_outlined,
-                          iconColor: const Color(0xFFCC8A2E),
-                          emojiColor: const Color(0xFFFFF3E3),
-                          title: 'Edit Profile',
-                          onTap: _showEditProfileSheet,
-                        ),
-                        _MenuItem(
-                          icon: Icons.lock_outline_rounded,
-                          iconColor: const Color(0xFFE8A020),
-                          emojiColor: const Color(0xFFFBF3E3),
-                          title: 'Change Password',
-                          onTap: _showChangePasswordSheet,
-                        ),
-
-
-                      ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Tap to update your target',
+                    style: GoogleFonts.dmSans(
+                      color: Colors.grey.shade400,
+                      fontSize: 12,
                     ),
-                    const SizedBox(height: 24),
-                    _sectionLabel('Achievements'),
-                    const SizedBox(height: 10),
-                    _menuGroup(
-                      [
-                        _MenuItem(
-                          icon: Icons.star_rounded,
-                          iconColor: const Color(0xFFE8A020),
-                          emojiColor: const Color(0xFFFFF3CD),
-                          title: 'Favourite Stations',
-                          subtitle: 'Your saved recycling spots',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                              const FavoriteStationsScreen(),
-                            ),
-                          ),
-                        ),
-                        _MenuItem(
-                          icon: Icons.history_rounded,
-                          iconColor: const Color(0xFF3DAB6A),
-                          emojiColor: const Color(0xFFE8F5EE),
-                          title: 'Impact History',
-                          subtitle: 'Joined $joined',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ImpactHistoryScreen(),
-                            ),
-                          ),
-
-                          isLast: true,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    _sectionLabel('App'),
-                    const SizedBox(height: 10),
-                    _menuGroup(
-                      [
-                       _MenuItem(
-                        icon: Icons.info_outline_rounded,
-                        iconColor: const Color(0xFF4A90D9),
-                        emojiColor: const Color(0xFFE8F0FA),
-                        title: 'About GreenTrack',
-                        subtitle: 'Version 1.0.0',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const AboutGreenTrackScreen(),
-                          ),
-                        ),
-                        isLast: true,
-                      ),
-                      ],
-                    ),
-                    if (_isAdmin) ...[
-                      const SizedBox(height: 24),
-                      _sectionLabel('Administration'),
-                      const SizedBox(height: 10),
-                      _menuGroup(
-                        [
-                          _MenuItem(
-                            icon: Icons.admin_panel_settings_rounded,
-                            iconColor: const Color(0xFF2D7A4F),
-                            emojiColor: const Color(0xFFE8F5EE),
-                            title: 'Admin Control Center',
-                            subtitle:
-                            'Manage users, records, and stations',
-                            onTap: _openAdminModule,
-                            isLast: true,
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 28),
-                    GestureDetector(
-                      onTap: _signOut,
-                      child: Container(
-                        width: double.infinity,
-                        padding:
-                        const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF0F0),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: const Color(0xFFFFD0D0),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.logout_rounded,
-                              color: Color(0xFFE05454),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Logout',
-                              style: GoogleFonts.dmSans(
-                                color: const Color(0xFFE05454),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5EE),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: const Color(0xFF3DAB6A).withOpacity(0.3),
+                  width: 1.2,
                 ),
+              ),
+              child: Text(
+                '${monthlyGoal % 1 == 0 ? monthlyGoal.toInt() : monthlyGoal.toStringAsFixed(1)} kg',
+                style: GoogleFonts.dmSans(
+                  color: const Color(0xFF2D7A4F),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.grey.shade300,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    ),
+
+    const SizedBox(height: 28),
+    _sectionLabel('Account'),
+    const SizedBox(height: 10),
+    _menuGroup(
+      [
+        _MenuItem(
+          icon: Icons.edit_outlined,
+          iconColor: const Color(0xFFCC8A2E),
+          emojiColor: const Color(0xFFFFF3E3),
+          title: 'Edit Profile',
+          onTap: _showEditProfileSheet,
+        ),
+        _MenuItem(
+          icon: Icons.lock_outline_rounded,
+          iconColor: const Color(0xFFE8A020),
+          emojiColor: const Color(0xFFFBF3E3),
+          title: 'Change Password',
+          onTap: _showChangePasswordSheet,
+        ),
+        _MenuItem(
+          icon: Icons.notifications_none_rounded,
+          iconColor: const Color(0xFF4A90D9),
+          emojiColor: const Color(0xFFE8F0FA),
+          title: 'Notifications',
+          badge: _unreadCount > 0 ? _unreadCount : null,
+          onTap: _openNotifications,
+        ),
+        _MenuItem(
+          icon: Icons.shield_outlined,
+          iconColor: const Color(0xFFE8A020),
+          emojiColor: const Color(0xFFFBF3E3),
+          title: 'Privacy & Security',
+          onTap: () => _showComingSoon('Privacy & Security'),
+          isLast: true,
+        ),
+      ],
+    ),
+
+    const SizedBox(height: 24),
+    _sectionLabel('Achievements'),
+    const SizedBox(height: 10),
+    _menuGroup(
+      [
+        _MenuItem(
+          icon: Icons.star_rounded,
+          iconColor: const Color(0xFFE8A020),
+          emojiColor: const Color(0xFFFFF3CD),
+          title: 'Favourite Stations',
+          subtitle: 'Your saved recycling spots',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const FavoriteStationsScreen(),
+            ),
+          ),
+        ),
+        _MenuItem(
+          icon: Icons.history_rounded,
+          iconColor: const Color(0xFF3DAB6A),
+          emojiColor: const Color(0xFFE8F5EE),
+          title: 'Impact History',
+          subtitle: 'Joined $joined',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const ImpactHistoryScreen(),
+            ),
+          ),
+        ),
+        _MenuItem(
+          icon: Icons.confirmation_number_rounded,
+          iconColor: const Color(0xFF2D7A4F),
+          emojiColor: const Color(0xFFF0F6F2),
+          title: 'Redeem History',
+          subtitle: 'Your vouchers and rewards',
+          isLast: true,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const RedemptionHistoryScreen(),
+            ),
+          ),
+        ),
+      ],
+    ),
+
+    const SizedBox(height: 24),
+    _sectionLabel('App'),
+    const SizedBox(height: 10),
+    _menuGroup(
+      [
+        _MenuItem(
+          icon: Icons.star_border_rounded,
+          iconColor: const Color(0xFFE8A020),
+          emojiColor: const Color(0xFFFFF8E1),
+          title: 'Rate the App',
+          onTap: () => _showComingSoon('Rate the App'),
+        ),
+        _MenuItem(
+          icon: Icons.info_outline_rounded,
+          iconColor: const Color(0xFF4A90D9),
+          emojiColor: const Color(0xFFE8F0FA),
+          title: 'About GreenTrack',
+          subtitle: 'Version 1.0.0',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const AboutGreenTrackScreen(),
+            ),
+          ),
+          isLast: true,
+        ),
+      ],
+    ),
+
+    if (_isAdmin) ...[
+      const SizedBox(height: 24),
+      _sectionLabel('Administration'),
+      const SizedBox(height: 10),
+      _menuGroup(
+        [
+          _MenuItem(
+            icon: Icons.admin_panel_settings_rounded,
+            iconColor: const Color(0xFF2D7A4F),
+            emojiColor: const Color(0xFFE8F5EE),
+            title: 'Admin Control Center',
+            subtitle: 'Manage users, records, and stations',
+            onTap: _openAdminModule,
+            isLast: true,
+          ),
+        ],
+      ),
+    ],
+
+    const SizedBox(height: 28),
+    GestureDetector(
+      onTap: _signOut,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF0F0),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFFFFD0D0),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.logout_rounded,
+              color: Color(0xFFE05454),
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Logout',
+              style: GoogleFonts.dmSans(
+                color: const Color(0xFFE05454),
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  ],
+),
               ),
             ),
           ],
@@ -883,7 +919,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -1821,7 +1857,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
                           height: 45,
                           decoration: BoxDecoration(
                             color: isFilled
-                                ? const Color(0xFF3DAB6A).withOpacity(0.1)
+                                ? const Color(0xFF3DAB6A).withValues(alpha: 0.1)
                                 : const Color(0xFFF7F9F8),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
@@ -2137,7 +2173,7 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
               child: Container(
                 margin: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha:0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -2154,7 +2190,7 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
                   margin: const EdgeInsets.fromLTRB(0, 8, 12, 8),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha:0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
@@ -2337,7 +2373,7 @@ class _FavCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -2859,7 +2895,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withValues(alpha: 0.04),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
