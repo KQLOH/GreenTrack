@@ -67,7 +67,9 @@ class RecyclingCenter {
 // ─── Map Screen ───────────────────────────────────────────────────────────────
 
 class RecycleMapScreen extends StatefulWidget {
-  const RecycleMapScreen({super.key});
+  const RecycleMapScreen({super.key, this.initialStationId});
+
+  final String? initialStationId;
 
   @override
   State<RecycleMapScreen> createState() => _RecycleMapScreenState();
@@ -330,11 +332,34 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     final nearby =
         withDistance.where((c) => c.distanceKm <= _radiusKm).toList();
     final display = nearby.isEmpty ? withDistance.take(20).toList() : nearby;
+    RecyclingCenter? targetCenter;
+    final targetId = widget.initialStationId;
+    if (targetId != null && targetId.isNotEmpty) {
+      for (final center in withDistance) {
+        if (center.id == targetId) {
+          targetCenter = center;
+          break;
+        }
+      }
+      final matchedCenter = targetCenter;
+      if (matchedCenter != null &&
+          !display.any((center) => center.id == matchedCenter.id)) {
+        display.insert(0, matchedCenter);
+      }
+    }
     setState(() {
       _centers = display;
       _isLoading = false;
-      _selectedCenter = null;
+      _selectedCenter = targetCenter;
     });
+
+    if (targetCenter != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _sheetAnim.forward();
+        _mapController.move(targetCenter!.location, 15.5);
+      });
+    }
   }
 
   void _selectCenter(RecyclingCenter center) {
@@ -681,29 +706,145 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     return Positioned(
       bottom: _selectedCenter != null ? 340 : 28,
       left: 16,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.09),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2))
-            ]),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.location_on_rounded,
-              color: Color(0xFF3DAB6A), size: 14),
-          const SizedBox(width: 6),
-          Text(
-              '${_centers.length} centre${_centers.length != 1 ? 's' : ''} found',
-              style: GoogleFonts.dmSans(
-                  color: const Color(0xFF1A4731),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600)),
-        ]),
+      child: GestureDetector(
+        onTap: _showCentersListSheet,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.09),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2))
+              ]),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.location_on_rounded,
+                color: Color(0xFF3DAB6A), size: 14),
+            const SizedBox(width: 6),
+            Text(
+                '${_centers.length} centre${_centers.length != 1 ? 's' : ''} found',
+                style: GoogleFonts.dmSans(
+                    color: const Color(0xFF1A4731),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(width: 6),
+            const Icon(Icons.chevron_right_rounded,
+                color: Color(0xFF3DAB6A), size: 16),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  void _showCentersListSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.72),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+              child: Row(
+                children: [
+                  Text(
+                    'Stations',
+                    style: GoogleFonts.dmSans(
+                      color: const Color(0xFF1A4731),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${_centers.length} found',
+                    style: GoogleFonts.dmSans(
+                      color: Colors.grey.shade500,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _centers.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No stations found in this area.',
+                        style: GoogleFonts.dmSans(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      itemCount: _centers.length,
+                      separatorBuilder: (_, __) =>
+                          Divider(height: 1, color: Colors.grey.shade100),
+                      itemBuilder: (_, i) {
+                        final center = _centers[i];
+                        return ListTile(
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 4),
+                          leading: Icon(
+                            Icons.recycling_rounded,
+                            color: center.isOpen
+                                ? const Color(0xFF3DAB6A)
+                                : const Color(0xFFE05454),
+                          ),
+                          title: Text(
+                            center.name,
+                            style: GoogleFonts.dmSans(
+                              color: const Color(0xFF1A4731),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          subtitle: Text(
+                            center.address,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.dmSans(
+                              color: Colors.grey.shade500,
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: Text(
+                            '${center.distanceKm.toStringAsFixed(1)} km',
+                            style: GoogleFonts.dmSans(
+                              color: Colors.grey.shade600,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _selectCenter(center);
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

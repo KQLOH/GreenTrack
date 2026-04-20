@@ -1,13 +1,14 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/supabase_client.dart';
-import 'recycle_screen.dart';
 import 'rewards_screen.dart';
 
 final supabase = supabaseClient;
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, this.onOpenStation});
+
+  final ValueChanged<String>? onOpenStation;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -57,19 +58,21 @@ class _DashboardScreenState extends State<DashboardScreen>
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      final profile = await supabase
-          .from('profiles')
-          .select('username, monthly_goal_kg')
-          .select('username, total_points')
-          .eq('id', user.id)
-          .single();
+      final profileRows = await supabase.from('profiles').select();
+      final profileList = List<Map<String, dynamic>>.from(profileRows as List);
+      final profile = profileList.firstWhere(
+        (row) => row['id']?.toString() == user.id,
+        orElse: () => <String, dynamic>{},
+      );
 
       // Load all records
-      final records = await supabase
+      final allRecords = await supabase
           .from('recycle_records')
           .select()
-          .eq('user_id', user.id)
           .order('date', ascending: false);
+      final records = (allRecords as List)
+          .where((row) => (row['user_id'] ?? '').toString() == user.id)
+          .toList();
 
       final now = DateTime.now();
       final startOfWeek =
@@ -88,12 +91,11 @@ class _DashboardScreenState extends State<DashboardScreen>
 
         final date = DateTime.parse(r['date'].toString());
         final weight = (r['weight_kg'] as num).toDouble();
-        final points = (r['points'] as num?)?.toInt() ?? 0;
         final category = (r['category'] ?? '').toString();
 
         catBreakdown[category] = (catBreakdown[category] ?? 0) + weight;
 
-        if (!date.isBefore(startOfMonth)) {
+        if (!date.isBefore(startOfWeek)) {
           weeklyWeight += weight;
           final dayIndex = date.weekday - 1;
           if (dayIndex >= 0 && dayIndex < 7) {
@@ -112,7 +114,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       try {
         final stationRows = await supabase
             .from('recycling_stations')
-            .select('name, address, is_open')
+            .select('id, name, address, is_open')
             .order('created_at', ascending: false)
             .limit(10);
 
@@ -122,6 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           if (name.isEmpty) continue;
 
           stations.add({
+            'id': map['id'],
             'name': name,
             'distance': (map['address'] ?? '').toString(),
             'open': map['is_open'] == null ? true : map['is_open'] == true,
@@ -199,18 +202,6 @@ class _DashboardScreenState extends State<DashboardScreen>
             ],
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const RecycleScreen()));
-          _loadData();
-        },
-        backgroundColor: const Color(0xFF2D7A4F),
-        icon: const Icon(Icons.recycling_rounded, color: Colors.white),
-        label: Text('Recycle',
-            style: GoogleFonts.dmSans(
-                color: Colors.white, fontWeight: FontWeight.w600)),
       ),
     );
   }
@@ -709,18 +700,28 @@ class _DashboardScreenState extends State<DashboardScreen>
             ],
           ),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: isOpen ? const Color(0xFFDFF5E9) : Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            isOpen ? 'Open' : 'Closed',
-            style: GoogleFonts.dmSans(
-                color: isOpen ? const Color(0xFF3DAB6A) : Colors.grey.shade400,
-                fontSize: 11,
-                fontWeight: FontWeight.w600),
+        GestureDetector(
+          onTap: isOpen
+              ? () {
+                  final stationId = station['id']?.toString();
+                  if (stationId == null || stationId.isEmpty) return;
+                  widget.onOpenStation?.call(stationId);
+                }
+              : null,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: isOpen ? const Color(0xFFDFF5E9) : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              isOpen ? 'Open' : 'Closed',
+              style: GoogleFonts.dmSans(
+                  color:
+                      isOpen ? const Color(0xFF3DAB6A) : Colors.grey.shade400,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600),
+            ),
           ),
         ),
       ]),

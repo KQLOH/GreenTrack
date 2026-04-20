@@ -120,15 +120,15 @@ class _RecycleScreenState extends State<RecycleScreen>
   List<RecycleRecord> get _approvedRecords {
     return _records.where((r) => r.status.toLowerCase() == 'approved').toList();
   }
-  List<String> _stations = List<String>.from(recyclingStations);
+  List<String> _stations = <String>[];
   Map<String, Map<String, double>> _stationCoordinates =
       <String, Map<String, double>>{};
   bool _isLoading = true;
+  int _currentPoints = 0;
 
   double get _totalWeight =>
       _approvedRecords.fold(0, (sum, r) => sum + r.weightKg);
-  int get _totalPoints =>
-      _approvedRecords.fold(0, (sum, r) => sum + r.points);
+  int get _totalPoints => _currentPoints;
   Map<String, double> get _categoryWeights {
     final map = <String, double>{};
     for (final r in _approvedRecords) {
@@ -173,10 +173,17 @@ class _RecycleScreenState extends State<RecycleScreen>
           .eq('user_id', user.id)
           .order('date', ascending: false);
 
+      final profile = await supabase
+          .from('profiles')
+          .select('total_points')
+          .eq('id', user.id)
+          .single();
+
       if (mounted) {
         setState(() {
           _records =
               (data as List).map((e) => RecycleRecord.fromMap(e)).toList();
+          _currentPoints = (profile['total_points'] as num?)?.toInt() ?? 0;
           _isLoading = false;
         });
       }
