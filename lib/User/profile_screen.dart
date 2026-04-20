@@ -1,16 +1,18 @@
-﻿import 'dart:io';
-import 'dart:async';
+﻿import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
-import '../admin/admin_module_screen.dart';
-import '../services/supabase_client.dart';
-import '../services/auth_service.dart';
-import 'recycle_map_screen.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../admin/admin_module_screen.dart';
+import '../services/auth_service.dart';
+import '../services/supabase_client.dart';
+import 'recycle_map_screen.dart';
 
 final _supabase = supabaseClient;
 final _authService = AuthService();
@@ -40,29 +42,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadData() async {
     if (!mounted) return;
 
-    // Only show full screen loading if we don't have profile data yet (initial load)
     if (_profile == null) {
       setState(() => _isLoading = true);
     }
 
     try {
-      // 1. Refresh the Auth session to get the absolute latest confirmed email
       final sessionRes = await _supabase.auth.refreshSession();
       final user = sessionRes.user;
 
-      if (user == null) return;
+      if (user == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
 
-      // 2. Fetch the profile from the database table
       final profile =
       await _supabase.from('profiles').select().eq('id', user.id).single();
 
-      // 3. AUTO-SYNC: If Auth email (verified link) is different from Table, update table
-      if (user.email != null && profile['email'] != user.email) {
-        await _supabase.from('profiles').update({'email': user.email}).eq('id', user.id);
-        profile['email'] = user.email;
-      }
-
-      // 3. AUTO-SYNC: If Auth email (verified link) is different from Table, update table
       if (user.email != null && profile['email'] != user.email) {
         await _supabase
             .from('profiles')
@@ -77,25 +72,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       double totalWeight = 0;
       int totalPoints = 0;
+
       for (final r in records as List) {
         totalWeight += (r['weight_kg'] as num).toDouble();
         totalPoints += (r['points'] as num?)?.toInt() ?? 0;
       }
 
+      final role = (profile['role'] ?? '').toString().toLowerCase();
+      final isAdminFlag = profile['is_admin'] == true;
+
+      int unreadCount = 0;
+      try {
+        final unread = await _supabase
+            .from('notifications')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('is_read', false);
+        unreadCount = (unread as List).length;
+      } catch (_) {}
+
       if (mounted) {
-        final role = (profile['role'] ?? '').toString().toLowerCase();
-        final isAdminFlag = profile['is_admin'] == true;
-
-        int unreadCount = 0;
-        try {
-          final unread = await _supabase
-              .from('notifications')
-              .select('id')
-              .eq('user_id', user.id)
-              .eq('is_read', false);
-          unreadCount = (unread as List).length;
-        } catch (_) {}
-
         setState(() {
           _profile = Map<String, dynamic>.from(profile);
           _profile!['email'] = user.email ?? profile['email'] ?? '';
@@ -107,7 +103,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _isLoading = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -126,33 +122,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Logout',
-            style: GoogleFonts.dmSans(
-                color: const Color(0xFF1A4731), fontWeight: FontWeight.w700)),
-        content: Text('Are you sure you want to logout?',
-            style: GoogleFonts.dmSans(color: Colors.grey.shade600)),
+        title: Text(
+          'Logout',
+          style: GoogleFonts.dmSans(
+            color: const Color(0xFF1A4731),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to logout?',
+          style: GoogleFonts.dmSans(color: Colors.grey.shade600),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel',
-                style: GoogleFonts.dmSans(color: Colors.grey.shade500)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.dmSans(color: Colors.grey.shade500),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFE05454),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
               elevation: 0,
             ),
-            child: Text('Logout',
-                style: GoogleFonts.dmSans(
-                    color: Colors.white, fontWeight: FontWeight.w600)),
+            child: Text(
+              'Logout',
+              style: GoogleFonts.dmSans(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
     );
-    if (confirm == true) await _supabase.auth.signOut();
+
+    if (confirm == true) {
+      await _supabase.auth.signOut();
+    }
   }
 
   void _showEditProfileSheet() async {
@@ -165,6 +177,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         currentEmail: _profile?['email'] ?? '',
       ),
     );
+
     if (result == true) {
       await _loadData();
     }
@@ -176,9 +189,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => ChangePasswordSheet(
-        email: authEmail,
-      ),
+      builder: (_) => ChangePasswordSheet(email: authEmail),
     );
   }
 
@@ -190,27 +201,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
       maxWidth: 512,
     );
 
-    if (image != null) {
-      setState(() => _isLoading = true);
-      try {
-        await _authService.uploadAvatar(File(image.path));
-        await _loadData();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+    if (image == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      await _authService.uploadAvatar(File(image.path));
+      await _loadData();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
             content: Text('Avatar updated successfully!'),
             backgroundColor: Color(0xFF2D7A4F),
-          ));
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
             content: Text('Failed to upload avatar: $e'),
             backgroundColor: const Color(0xFFE05454),
-          ));
-        }
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
+          ),
+        );
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -228,18 +245,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _openAdminModule() {
     Navigator.push(
-        context, MaterialPageRoute(builder: (_) => const AdminModuleScreen()));
+      context,
+      MaterialPageRoute(builder: (_) => const AdminModuleScreen()),
+    );
   }
 
   void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('$feature – coming soon!',
-          style: GoogleFonts.dmSans(color: Colors.white)),
-      backgroundColor: const Color(0xFF2D7A4F),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.all(16),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$feature – coming soon!',
+          style: GoogleFonts.dmSans(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF2D7A4F),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   @override
@@ -257,14 +280,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: const Color(0xFFF0F6F2),
       body: _isLoading
           ? const Center(
-          child: CircularProgressIndicator(color: Color(0xFF2D7A4F)))
+        child: CircularProgressIndicator(color: Color(0xFF2D7A4F)),
+      )
           : RefreshIndicator(
         color: const Color(0xFF2D7A4F),
         onRefresh: _loadData,
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            // ── Header ────────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Container(
                 decoration: const BoxDecoration(
@@ -278,312 +301,379 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   bottom: false,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-                    child: Column(children: [
-                      Row(children: [
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color:
-                                  Colors.white.withOpacity(0.2)),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () => Navigator.pop(context),
+                              child: Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.2),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.arrow_back_ios_new_rounded,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
                             ),
-                            child: const Icon(
-                                Icons.arrow_back_ios_new_rounded,
-                                color: Colors.white,
-                                size: 16),
-                          ),
-                        ),
-                        const Spacer(),
-                        Text('Profile',
-                            style: GoogleFonts.dmSans(
+                            const Spacer(),
+                            Text(
+                              'Profile',
+                              style: GoogleFonts.dmSans(
                                 color: Colors.white,
                                 fontSize: 16,
-                                fontWeight: FontWeight.w600)),
-                        const Spacer(),
-                        GestureDetector(
-                          onTap: _showEditProfileSheet,
-                          child: Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color:
-                                  Colors.white.withOpacity(0.2)),
-                            ),
-                            child: const Icon(Icons.edit_outlined,
-                                color: Colors.white, size: 17),
-                          ),
-                        ),
-                      ]),
-                      const SizedBox(height: 24),
-                      Stack(
-                        children: [
-                          GestureDetector(
-                            onTap: _pickAndUploadAvatar,
-                            child: Container(
-                              width: 84,
-                              height: 84,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF7EEDB0),
-                                borderRadius: BorderRadius.circular(26),
-                                image: avatarUrl != null
-                                    ? DecorationImage(
-                                  image: avatarUrl.startsWith('data:image')
-                                      ? MemoryImage(base64Decode(avatarUrl.split(',').last)) as ImageProvider
-                                      : NetworkImage(avatarUrl),
-                                  fit: BoxFit.cover,
-                                )
-                                    : null,
-                                boxShadow: [
-                                  BoxShadow(
-                                      color: Colors.black
-                                          .withOpacity(0.15),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 6))
-                                ],
+                                fontWeight: FontWeight.w600,
                               ),
-                              child: avatarUrl == null
-                                  ? Center(
-                                child: Text(
-                                  username.isNotEmpty
-                                      ? username[0].toUpperCase()
-                                      : 'U',
-                                  style: GoogleFonts.dmSerifDisplay(
-                                      color: const Color(0xFF1A4731),
-                                      fontSize: 34),
-                                ),
-                              )
-                                  : null,
                             ),
-                          ),
-                          Positioned(
-                            right: -2,
-                            bottom: -2,
-                            child: GestureDetector(
+                            const Spacer(),
+                            GestureDetector(
+                              onTap: _showEditProfileSheet,
+                              child: Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.2),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.edit_outlined,
+                                  color: Colors.white,
+                                  size: 17,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Stack(
+                          children: [
+                            GestureDetector(
                               onTap: _pickAndUploadAvatar,
                               child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF3DAB6A),
-                                  shape: BoxShape.circle,
+                                width: 84,
+                                height: 84,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF7EEDB0),
+                                  borderRadius: BorderRadius.circular(26),
+                                  image: avatarUrl != null
+                                      ? DecorationImage(
+                                    image: avatarUrl
+                                        .startsWith('data:image')
+                                        ? MemoryImage(
+                                      base64Decode(
+                                        avatarUrl
+                                            .split(',')
+                                            .last,
+                                      ),
+                                    )
+                                    as ImageProvider
+                                        : NetworkImage(avatarUrl),
+                                    fit: BoxFit.cover,
+                                  )
+                                      : null,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                      Colors.black.withOpacity(0.15),
+                                      blurRadius: 16,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
                                 ),
-                                child: const Icon(Icons.camera_alt_rounded,
-                                    color: Colors.white, size: 14),
+                                child: avatarUrl == null
+                                    ? Center(
+                                  child: Text(
+                                    username.isNotEmpty
+                                        ? username[0].toUpperCase()
+                                        : 'U',
+                                    style:
+                                    GoogleFonts.dmSerifDisplay(
+                                      color:
+                                      const Color(0xFF1A4731),
+                                      fontSize: 34,
+                                    ),
+                                  ),
+                                )
+                                    : null,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(username,
+                            Positioned(
+                              right: -2,
+                              bottom: -2,
+                              child: GestureDetector(
+                                onTap: _pickAndUploadAvatar,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF3DAB6A),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.camera_alt_rounded,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          username,
                           style: GoogleFonts.dmSerifDisplay(
-                              color: Colors.white, fontSize: 22)),
-                      const SizedBox(height: 4),
-                      Text(email,
+                            color: Colors.white,
+                            fontSize: 22,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          email,
                           style: GoogleFonts.dmSans(
-                              color: Colors.white60, fontSize: 13)),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2D7A4F),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
+                            color: Colors.white60,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2D7A4F),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
                               color: const Color(0xFF7EEDB0)
                                   .withOpacity(0.4),
-                              width: 1.5),
-                        ),
-                        child:
-                        Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.eco_rounded,
-                              color: Color(0xFF7EEDB0), size: 15),
-                          const SizedBox(width: 6),
-                          Text('${level['label']} · Lv. ${level['level']}',
-                              style: GoogleFonts.dmSans(
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.eco_rounded,
+                                color: Color(0xFF7EEDB0),
+                                size: 15,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${level['label']} · Lv. ${level['level']}',
+                                style: GoogleFonts.dmSans(
                                   color: const Color(0xFF7EEDB0),
                                   fontSize: 13,
-                                  fontWeight: FontWeight.w600)),
-                        ]),
-                      ),
-                    ]),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(18, 20, 18, 40),
               sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  // ── Stats ──────────────────────────────────────────
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
+                delegate: SliverChildListDelegate(
+                  [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 20,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
                             color: Colors.black.withOpacity(0.05),
                             blurRadius: 12,
-                            offset: const Offset(0, 4))
-                      ],
-                    ),
-                    child: Row(children: [
-                      _statItem('${_totalWeight.toStringAsFixed(1)} kg',
-                          'Recycled'),
-                      _divider(),
-                      _statItem(_co2Saved.toStringAsFixed(1), 'CO2 Saved'),
-                      _divider(),
-                      _statItem(_totalPoints.toString(), 'Points'),
-                    ]),
-                  ),
-
-                  const SizedBox(height: 28),
-
-                  // ── Account ────────────────────────────────────────
-                  _sectionLabel('Account'),
-                  const SizedBox(height: 10),
-                  _menuGroup([
-                    _MenuItem(
-                      icon: Icons.edit_outlined,
-                      iconColor: const Color(0xFFCC8A2E),
-                      emojiColor: const Color(0xFFFFF3E3),
-                      title: 'Edit Profile',
-                      onTap: _showEditProfileSheet,
-                    ),
-                    _MenuItem(
-                      icon: Icons.lock_outline_rounded,
-                      iconColor: const Color(0xFFE8A020),
-                      emojiColor: const Color(0xFFFBF3E3),
-                      title: 'Change Password',
-                      onTap: _showChangePasswordSheet,
-                    ),
-                    _MenuItem(
-                      icon: Icons.notifications_none_rounded,
-                      iconColor: const Color(0xFF4A90D9),
-                      emojiColor: const Color(0xFFE8F0FA),
-                      title: 'Notifications',
-                      badge: _unreadCount > 0 ? _unreadCount : null,
-                      onTap: () => _openNotifications(),
-                    ),
-                    _MenuItem(
-                      icon: Icons.shield_outlined,
-                      iconColor: const Color(0xFFE8A020),
-                      emojiColor: const Color(0xFFFBF3E3),
-                      title: 'Privacy & Security',
-                      onTap: () => _showComingSoon('Privacy & Security'),
-                      isLast: true,
-                    ),
-                  ]),
-
-                  const SizedBox(height: 24),
-
-                  // ── Achievements ───────────────────────────────────
-                  _sectionLabel('Achievements'),
-                  const SizedBox(height: 10),
-                  _menuGroup([
-                    _MenuItem(
-                      icon: Icons.star_rounded,
-                      iconColor: const Color(0xFFE8A020),
-                      emojiColor: const Color(0xFFFFF3CD),
-                      title: 'Favourite Stations',
-                      subtitle: 'Your saved recycling spots',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const FavoriteStationsScreen()),
-                      ),
-                    ),
-                    _MenuItem(
-                      icon: Icons.history_rounded,
-                      iconColor: const Color(0xFF3DAB6A),
-                      emojiColor: const Color(0xFFE8F5EE),
-                      title: 'Impact History',
-                      subtitle: 'Joined $joined',
-                      onTap: () => _showComingSoon('Impact History'),
-                      isLast: true,
-                    ),
-                  ]),
-
-                  const SizedBox(height: 24),
-
-                  // ── App ────────────────────────────────────────────
-                  _sectionLabel('App'),
-                  const SizedBox(height: 10),
-                  _menuGroup([
-                    _MenuItem(
-                      icon: Icons.star_border_rounded,
-                      iconColor: const Color(0xFFE8A020),
-                      emojiColor: const Color(0xFFFFF8E1),
-                      title: 'Rate the App',
-                      onTap: () => _showComingSoon('Rate the App'),
-                    ),
-                    _MenuItem(
-                      icon: Icons.info_outline_rounded,
-                      iconColor: const Color(0xFF4A90D9),
-                      emojiColor: const Color(0xFFE8F0FA),
-                      title: 'About GreenTrack',
-                      subtitle: 'Version 1.0.0',
-                      onTap: () => _showComingSoon('About'),
-                      isLast: true,
-                    ),
-                  ]),
-
-                  if (_isAdmin) ...[
-                    const SizedBox(height: 24),
-                    _sectionLabel('Administration'),
-                    const SizedBox(height: 10),
-                    _menuGroup([
-                      _MenuItem(
-                        icon: Icons.admin_panel_settings_rounded,
-                        iconColor: const Color(0xFF2D7A4F),
-                        emojiColor: const Color(0xFFE8F5EE),
-                        title: 'Admin Control Center',
-                        subtitle: 'Manage users, records, and stations',
-                        onTap: _openAdminModule,
-                        isLast: true,
-                      ),
-                    ]),
-                  ],
-
-                  const SizedBox(height: 28),
-
-                  // ── Logout ─────────────────────────────────────────
-                  GestureDetector(
-                    onTap: _signOut,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF0F0),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                            color: const Color(0xFFFFD0D0), width: 1.5),
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: Row(
+                        children: [
+                          _statItem(
+                            '${_totalWeight.toStringAsFixed(1)} kg',
+                            'Recycled',
+                          ),
+                          _divider(),
+                          _statItem(
+                            _co2Saved.toStringAsFixed(1),
+                            'CO2 Saved',
+                          ),
+                          _divider(),
+                          _statItem(
+                            _totalPoints.toString(),
+                            'Points',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    _sectionLabel('Account'),
+                    const SizedBox(height: 10),
+                    _menuGroup(
+                      [
+                        _MenuItem(
+                          icon: Icons.edit_outlined,
+                          iconColor: const Color(0xFFCC8A2E),
+                          emojiColor: const Color(0xFFFFF3E3),
+                          title: 'Edit Profile',
+                          onTap: _showEditProfileSheet,
+                        ),
+                        _MenuItem(
+                          icon: Icons.lock_outline_rounded,
+                          iconColor: const Color(0xFFE8A020),
+                          emojiColor: const Color(0xFFFBF3E3),
+                          title: 'Change Password',
+                          onTap: _showChangePasswordSheet,
+                        ),
+                        _MenuItem(
+                          icon: Icons.notifications_none_rounded,
+                          iconColor: const Color(0xFF4A90D9),
+                          emojiColor: const Color(0xFFE8F0FA),
+                          title: 'Notifications',
+                          badge: _unreadCount > 0 ? _unreadCount : null,
+                          onTap: _openNotifications,
+                        ),
+                        _MenuItem(
+                          icon: Icons.shield_outlined,
+                          iconColor: const Color(0xFFE8A020),
+                          emojiColor: const Color(0xFFFBF3E3),
+                          title: 'Privacy & Security',
+                          onTap: () =>
+                              _showComingSoon('Privacy & Security'),
+                          isLast: true,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    _sectionLabel('Achievements'),
+                    const SizedBox(height: 10),
+                    _menuGroup(
+                      [
+                        _MenuItem(
+                          icon: Icons.star_rounded,
+                          iconColor: const Color(0xFFE8A020),
+                          emojiColor: const Color(0xFFFFF3CD),
+                          title: 'Favourite Stations',
+                          subtitle: 'Your saved recycling spots',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                              const FavoriteStationsScreen(),
+                            ),
+                          ),
+                        ),
+                        _MenuItem(
+                          icon: Icons.history_rounded,
+                          iconColor: const Color(0xFF3DAB6A),
+                          emojiColor: const Color(0xFFE8F5EE),
+                          title: 'Impact History',
+                          subtitle: 'Joined $joined',
+                          onTap: () => _showComingSoon('Impact History'),
+                          isLast: true,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    _sectionLabel('App'),
+                    const SizedBox(height: 10),
+                    _menuGroup(
+                      [
+                        _MenuItem(
+                          icon: Icons.star_border_rounded,
+                          iconColor: const Color(0xFFE8A020),
+                          emojiColor: const Color(0xFFFFF8E1),
+                          title: 'Rate the App',
+                          onTap: () => _showComingSoon('Rate the App'),
+                        ),
+                        _MenuItem(
+                          icon: Icons.info_outline_rounded,
+                          iconColor: const Color(0xFF4A90D9),
+                          emojiColor: const Color(0xFFE8F0FA),
+                          title: 'About GreenTrack',
+                          subtitle: 'Version 1.0.0',
+                          onTap: () => _showComingSoon('About'),
+                          isLast: true,
+                        ),
+                      ],
+                    ),
+                    if (_isAdmin) ...[
+                      const SizedBox(height: 24),
+                      _sectionLabel('Administration'),
+                      const SizedBox(height: 10),
+                      _menuGroup(
+                        [
+                          _MenuItem(
+                            icon: Icons.admin_panel_settings_rounded,
+                            iconColor: const Color(0xFF2D7A4F),
+                            emojiColor: const Color(0xFFE8F5EE),
+                            title: 'Admin Control Center',
+                            subtitle:
+                            'Manage users, records, and stations',
+                            onTap: _openAdminModule,
+                            isLast: true,
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 28),
+                    GestureDetector(
+                      onTap: _signOut,
+                      child: Container(
+                        width: double.infinity,
+                        padding:
+                        const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF0F0),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFFFFD0D0),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.logout_rounded,
-                                color: Color(0xFFE05454), size: 18),
+                            const Icon(
+                              Icons.logout_rounded,
+                              color: Color(0xFFE05454),
+                              size: 18,
+                            ),
                             const SizedBox(width: 8),
-                            Text('Logout',
-                                style: GoogleFonts.dmSans(
-                                    color: const Color(0xFFE05454),
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600)),
-                          ]),
+                            Text(
+                              'Logout',
+                              style: GoogleFonts.dmSans(
+                                color: const Color(0xFFE05454),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ]),
+                  ],
+                ),
               ),
             ),
           ],
@@ -594,17 +684,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _statItem(String value, String label) {
     return Expanded(
-      child: Column(children: [
-        Text(value,
+      child: Column(
+        children: [
+          Text(
+            value,
             style: GoogleFonts.dmSans(
-                color: const Color(0xFF1A4731),
-                fontSize: 20,
-                fontWeight: FontWeight.w800)),
-        const SizedBox(height: 2),
-        Text(label,
-            style:
-            GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 12)),
-      ]),
+              color: const Color(0xFF1A4731),
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: GoogleFonts.dmSans(
+              color: Colors.grey.shade400,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -612,11 +711,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       Container(width: 1, height: 36, color: Colors.grey.shade100);
 
   Widget _sectionLabel(String title) {
-    return Text(title,
-        style: GoogleFonts.dmSans(
-            color: const Color(0xFF1A4731),
-            fontSize: 15,
-            fontWeight: FontWeight.w700));
+    return Text(
+      title,
+      style: GoogleFonts.dmSans(
+        color: const Color(0xFF1A4731),
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+      ),
+    );
   }
 
   Widget _menuGroup(List<_MenuItem> items) {
@@ -626,9 +728,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 3))
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Column(children: items),
@@ -666,61 +769,78 @@ class _MenuItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                    color: emojiColor, borderRadius: BorderRadius.circular(12)),
-                child: Icon(icon, color: iconColor, size: 20),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: emojiColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 20),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(title,
-                          style: GoogleFonts.dmSans(
-                              color: const Color(0xFF1A4731),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600)),
+                      Text(
+                        title,
+                        style: GoogleFonts.dmSans(
+                          color: const Color(0xFF1A4731),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       if (subtitle != null) ...[
                         const SizedBox(height: 2),
-                        Text(subtitle!,
-                            style: GoogleFonts.dmSans(
-                                color: Colors.grey.shade400, fontSize: 12)),
+                        Text(
+                          subtitle!,
+                          style: GoogleFonts.dmSans(
+                            color: Colors.grey.shade400,
+                            fontSize: 12,
+                          ),
+                        ),
                       ],
-                    ]),
-              ),
-              if (badge != null) ...[
-                Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE05454),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    badge! > 99 ? '99+' : '$badge',
-                    style: GoogleFonts.dmSans(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 6),
+                if (badge != null) ...[
+                  Container(
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE05454),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      badge! > 99 ? '99+' : '$badge',
+                      style: GoogleFonts.dmSans(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.grey.shade300,
+                  size: 20,
+                ),
               ],
-              Icon(Icons.chevron_right_rounded,
-                  color: Colors.grey.shade300, size: 20),
-            ]),
+            ),
           ),
         ),
         if (!isLast)
           Divider(
-              height: 1,
-              color: Colors.grey.shade100,
-              indent: 16,
-              endIndent: 16),
+            height: 1,
+            color: Colors.grey.shade100,
+            indent: 16,
+            endIndent: 16,
+          ),
       ],
     );
   }
@@ -762,10 +882,12 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
 
     setState(() => _isSaving = true);
+
     try {
       if (name != widget.currentUsername) {
         await _authService.updateUsername(name);
@@ -775,61 +897,77 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         await _authService.updateEmail(email);
         if (mounted) {
           Navigator.pop(context, true);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.mark_email_read_outlined,
-                    color: Color(0xFF7EEDB0), size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Confirmation link sent to $email',
-                    style:
-                        GoogleFonts.dmSans(color: Colors.white, fontSize: 14),
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(
+                    Icons.mark_email_read_outlined,
+                    color: Color(0xFF7EEDB0),
+                    size: 20,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Confirmation link sent to $email',
+                      style: GoogleFonts.dmSans(
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFF1A4731),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+              duration: const Duration(seconds: 4),
             ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: const Color(0xFF1A4731), // 使用你 Header 的深綠色
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            margin: const EdgeInsets.fromLTRB(
-                20, 0, 20, 40), // 讓它浮起來更高一點，避開 BottomBar
-            duration: const Duration(seconds: 4),
-          ));
+          );
         }
       } else {
         if (mounted) {
           Navigator.pop(context, true);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded,
-                    color: Color(0xFF1A4731), size: 20),
-                const SizedBox(width: 12),
-                Text(
-                  'Profile updated successfully!',
-                  style: GoogleFonts.dmSans(
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    color: Color(0xFF1A4731),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Profile updated successfully!',
+                    style: GoogleFonts.dmSans(
                       color: const Color(0xFF1A4731),
-                      fontWeight: FontWeight.bold),
-                ),
-              ],
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: const Color(0xFF7EEDB0),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
             ),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: const Color(0xFF7EEDB0), // 使用你等級標籤的亮綠色
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-          ));
+          );
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: const Color(0xFFE05454),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: const Color(0xFFE05454),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -854,31 +992,40 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
             children: [
               Center(
                 child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(2))),
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
               const SizedBox(height: 20),
-              Text('Edit Profile',
-                  style: GoogleFonts.dmSans(
-                      color: const Color(0xFF1A4731),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700)),
+              Text(
+                'Edit Profile',
+                style: GoogleFonts.dmSans(
+                  color: const Color(0xFF1A4731),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 16),
               _textField(
                 controller: _nameController,
                 label: 'Username',
                 icon: Icons.person_outline_rounded,
                 validator: (val) {
-                  if (val == null || val.isEmpty)
+                  if (val == null || val.isEmpty) {
                     return 'Please enter a username';
+                  }
                   if (val.length < 6) return 'At least 6 characters';
+
                   final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(val);
                   final hasDigit = RegExp(r'[0-9]').hasMatch(val);
-                  if (!hasLetter || !hasDigit)
+
+                  if (!hasLetter || !hasDigit) {
                     return 'Must contain letters and numbers';
+                  }
                   return null;
                 },
               ),
@@ -888,9 +1035,12 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                 label: 'Email Address',
                 icon: Icons.email_outlined,
                 keyboardType: TextInputType.emailAddress,
-                validator: (val) => (val == null || !val.contains('@'))
-                    ? 'Invalid email'
-                    : null,
+                validator: (val) {
+                  if (val == null || !val.contains('@')) {
+                    return 'Invalid email';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 24),
               SizedBox(
@@ -901,229 +1051,25 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2D7A4F),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                   child: _isSaving
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Text('Save Changes', style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _textField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 15),
-      keyboardType: keyboardType,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: GoogleFonts.dmSans(color: Colors.grey.shade500),
-        filled: true,
-        fillColor: const Color(0xFFF7F9F8),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF3DAB6A), width: 1.5)),
-        prefixIcon: Icon(icon, color: const Color(0xFF3DAB6A), size: 20),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      ),
-    );
-  }
-}
-
-class ChangePasswordSheet extends StatefulWidget {
-  final String email;
-  const ChangePasswordSheet({super.key, required this.email});
-
-  @override
-  State<ChangePasswordSheet> createState() => _ChangePasswordSheetState();
-}
-
-class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _otpController = TextEditingController();
-  final _passController = TextEditingController();
-  final _confirmController = TextEditingController();
-
-  int _step = 1;
-  bool _isSaving = false;
-  int _resendCountdown = 0;
-  String? _localError;
-  Timer? _timer;
-
-  void _startCountdown() {
-    setState(() => _resendCountdown = 60);
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_resendCountdown > 0) {
-        if (mounted) setState(() => _resendCountdown--);
-      } else {
-        _timer?.cancel();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _otpController.dispose();
-    _passController.dispose();
-    _confirmController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _sendOTP() async {
-    setState(() => _isSaving = true);
-    try {
-      await _supabase.auth.resetPasswordForEmail(widget.email);
-      if (mounted) {
-        setState(() => _step = 2);
-        _startCountdown();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('8-digit code sent to registered address: ${widget.email}'),
-          backgroundColor: const Color(0xFF2D7A4F),
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: const Color(0xFFE05454),
-        ));
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }
-  void _showAppSnackBar(BuildContext context, String message, {required bool isError, required IconData icon}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(
-        children: [
-          Icon(icon, color: isError ? Colors.white : const Color(0xFF1A4731), size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Text(message,
-                  style: GoogleFonts.dmSans(
-                      color: isError ? Colors.white : const Color(0xFF1A4731),
-                      fontWeight: FontWeight.w500
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
                   )
-              )
-          ),
-        ],
-      ),
-      behavior: SnackBarBehavior.floating,
-      backgroundColor: isError ? const Color(0xFFE05454) : const Color(0xFF7EEDB0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-    ));
-  }
-  Future<void> _verifyAndSave() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isSaving = true;
-      _localError = null;
-    });
-
-    try {
-      await _supabase.auth.verifyOTP(
-        email: widget.email,
-        token: _otpController.text.trim(),
-        type: OtpType.recovery,
-      );
-
-      await _authService.updatePassword(_passController.text.trim());
-
-      if (mounted) {
-        Navigator.pop(context);
-
-        _showAppSnackBar(
-            context,
-            'Password updated successfully!',
-            isError: false,
-            icon: Icons.lock_reset_rounded
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          // ❌ 失敗時，不 pop，直接把錯誤訊息寫進變數
-          _localError = 'Invalid or expired code';
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding:
-      EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Form(
-          key: _formKey,
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(2))),
-                ),
-                const SizedBox(height: 20),
-                Text('Change Password',
+                      : Text(
+                    'Save Changes',
                     style: GoogleFonts.dmSans(
-                        color: const Color(0xFF1A4731),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
-                Text('A verification code will be sent to your registered email: ${widget.email}',
-                    style: GoogleFonts.dmSans(
-                        color: Colors.grey.shade600,
-                        fontSize: 13)),
-                const SizedBox(height: 20),
-
-                if (_step == 1) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isSaving ? null : _sendOTP,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2D7A4F),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                        elevation: 0,
-                      ),
-                      child: _isSaving
-                          ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2))
-                      : Text('Save Changes',
-                          style: GoogleFonts.dmSans(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600)),
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1142,7 +1088,10 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
   }) {
     return TextFormField(
       controller: controller,
-      style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 15),
+      style: GoogleFonts.dmSans(
+        color: const Color(0xFF1A4731),
+        fontSize: 15,
+      ),
       keyboardType: keyboardType,
       validator: validator,
       decoration: InputDecoration(
@@ -1151,21 +1100,28 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
         filled: true,
         fillColor: const Color(0xFFF7F9F8),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF3DAB6A), width: 1.5)),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF3DAB6A), width: 1.5),
+        ),
         prefixIcon: Icon(icon, color: const Color(0xFF3DAB6A), size: 20),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
     );
   }
+}
 
 class ChangePasswordSheet extends StatefulWidget {
   final String email;
-  const ChangePasswordSheet({super.key, required this.email});
+
+  const ChangePasswordSheet({
+    super.key,
+    required this.email,
+  });
 
   @override
   State<ChangePasswordSheet> createState() => _ChangePasswordSheetState();
@@ -1210,46 +1166,62 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
       if (mounted) {
         setState(() => _step = 2);
         _startCountdown();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content:
-              Text('8-digit code sent to registered address: ${widget.email}'),
-          backgroundColor: const Color(0xFF2D7A4F),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+            Text('8-digit code sent to registered address: ${widget.email}'),
+            backgroundColor: const Color(0xFF2D7A4F),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: const Color(0xFFE05454),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: const Color(0xFFE05454),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  void _showAppSnackBar(BuildContext context, String message,
-      {required bool isError, required IconData icon}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(
-        children: [
-          Icon(icon,
+  void _showAppSnackBar(
+      BuildContext context,
+      String message, {
+        required bool isError,
+        required IconData icon,
+      }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              icon,
               color: isError ? Colors.white : const Color(0xFF1A4731),
-              size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Text(message,
-                  style: GoogleFonts.dmSans(
-                      color: isError ? Colors.white : const Color(0xFF1A4731),
-                      fontWeight: FontWeight.w500))),
-        ],
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.dmSans(
+                  color: isError ? Colors.white : const Color(0xFF1A4731),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor:
+        isError ? const Color(0xFFE05454) : const Color(0xFF7EEDB0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
       ),
-      behavior: SnackBarBehavior.floating,
-      backgroundColor:
-          isError ? const Color(0xFFE05454) : const Color(0xFF7EEDB0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-    ));
+    );
   }
 
   Future<void> _verifyAndSave() async {
@@ -1271,14 +1243,16 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
 
       if (mounted) {
         Navigator.pop(context);
-
-        _showAppSnackBar(context, 'Password updated successfully!',
-            isError: false, icon: Icons.lock_reset_rounded);
+        _showAppSnackBar(
+          context,
+          'Password updated successfully!',
+          isError: false,
+          icon: Icons.lock_reset_rounded,
+        );
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
-          // ❌ 失敗時，不 pop，直接把錯誤訊息寫進變數
           _localError = 'Invalid or expired code';
         });
       }
@@ -1290,8 +1264,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         decoration: const BoxDecoration(
@@ -1301,217 +1274,258 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
         child: Form(
           key: _formKey,
           child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(2))),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-                const SizedBox(height: 20),
-                Text('Change Password',
-                    style: GoogleFonts.dmSans(
-                        color: const Color(0xFF1A4731),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
-                Text(
-                    'A verification code will be sent to your registered email: ${widget.email}',
-                    style: GoogleFonts.dmSans(
-                        color: Colors.grey.shade600, fontSize: 13)),
-                const SizedBox(height: 20),
-                if (_step == 1) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isSaving ? null : _sendOTP,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2D7A4F),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                        elevation: 0,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Change Password',
+                style: GoogleFonts.dmSans(
+                  color: const Color(0xFF1A4731),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'A verification code will be sent to your registered email: ${widget.email}',
+                style: GoogleFonts.dmSans(
+                  color: Colors.grey.shade600,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 20),
+              if (_step == 1) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _sendOTP,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2D7A4F),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      child: _isSaving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2.5))
-                          : Text('Send Verification Code',
-                              style: GoogleFonts.dmSans(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15)),
+                      elevation: 0,
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                        : Text(
+                      'Send Verification Code',
+                      style: GoogleFonts.dmSans(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
                     ),
                   ),
-                ] else ...[
-                  Text('Enter the 8-digit code',
-                      style: GoogleFonts.dmSans(
-                          color: Colors.grey.shade600, fontSize: 13)),
-                  const SizedBox(height: 16),
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: List.generate(8, (index) {
-                          bool isFilled = _otpController.text.length > index;
-                          return Container(
-                            width: 32,
-                            height: 45,
-                            decoration: BoxDecoration(
+                ),
+              ] else ...[
+                Text(
+                  'Enter the 8-digit code',
+                  style: GoogleFonts.dmSans(
+                    color: Colors.grey.shade600,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(8, (index) {
+                        final isFilled = _otpController.text.length > index;
+                        return Container(
+                          width: 32,
+                          height: 45,
+                          decoration: BoxDecoration(
+                            color: isFilled
+                                ? const Color(0xFF3DAB6A).withOpacity(0.1)
+                                : const Color(0xFFF7F9F8),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
                               color: isFilled
-                                  ? const Color(0xFF3DAB6A).withOpacity(0.1)
-                                  : const Color(0xFFF7F9F8),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                  color: isFilled
-                                      ? const Color(0xFF3DAB6A)
-                                      : Colors.grey.shade200),
+                                  ? const Color(0xFF3DAB6A)
+                                  : Colors.grey.shade200,
                             ),
-                            child: Center(
-                              child: Text(
-                                isFilled ? _otpController.text[index] : "",
-                                style: const TextStyle(
-                                    color: Color(0xFF1A4731),
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold),
+                          ),
+                          child: Center(
+                            child: Text(
+                              isFilled ? _otpController.text[index] : '',
+                              style: const TextStyle(
+                                color: Color(0xFF1A4731),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          );
-                        }),
-                      ),
-                      Opacity(
-                        opacity: 0,
-                        child: TextField(
-                          controller: _otpController,
-                          keyboardType: TextInputType.number,
-                          maxLength: 8,
-                          autofocus: true,
-                          readOnly: _isSaving,
-                          onChanged: (val) {
-                            setState(() {});
-                          },
-                          decoration: const InputDecoration(
-                            counterText: "",
-                            border: InputBorder.none,
                           ),
+                        );
+                      }),
+                    ),
+                    Opacity(
+                      opacity: 0,
+                      child: TextField(
+                        controller: _otpController,
+                        keyboardType: TextInputType.number,
+                        maxLength: 8,
+                        autofocus: true,
+                        readOnly: _isSaving,
+                        onChanged: (_) => setState(() {}),
+                        decoration: const InputDecoration(
+                          counterText: '',
+                          border: InputBorder.none,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  _passField(
-                    _passController,
-                    'New Password',
-                    validator: (val) {
-                      if (val == null || val.isEmpty)
-                        return 'Please enter a password';
-                      if (val.length < 6)
-                        return 'Password must be at least 6 characters';
-                      final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(val);
-                      final hasDigit = RegExp(r'[0-9]').hasMatch(val);
-                      final hasSymbol =
-                          RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(val);
-                      if (!hasLetter || !hasDigit || !hasSymbol) {
-                        return 'Must include letters, numbers, and symbols';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  _passField(
-                    _confirmController,
-                    'Confirm New Password',
-                    validator: (val) => (val != _passController.text)
-                        ? 'Passwords do not match'
-                        : null,
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      TextButton(
-                        onPressed: _resendCountdown > 0 ? null : _sendOTP,
-                        child: Text(
-                          _resendCountdown > 0
-                              ? 'Resend in ${_resendCountdown}s'
-                              : 'Resend Code',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _passField(
+                  _passController,
+                  'New Password',
+                  validator: (val) {
+                    if (val == null || val.isEmpty) {
+                      return 'Please enter a password';
+                    }
+                    if (val.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+
+                    final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(val);
+                    final hasDigit = RegExp(r'[0-9]').hasMatch(val);
+                    final hasSymbol =
+                    RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(val);
+
+                    if (!hasLetter || !hasDigit || !hasSymbol) {
+                      return 'Must include letters, numbers, and symbols';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                _passField(
+                  _confirmController,
+                  'Confirm New Password',
+                  validator: (val) {
+                    if (val != _passController.text) {
+                      return 'Passwords do not match';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton(
+                      onPressed: _resendCountdown > 0 ? null : _sendOTP,
+                      child: Text(
+                        _resendCountdown > 0
+                            ? 'Resend in ${_resendCountdown}s'
+                            : 'Resend Code',
+                        style: GoogleFonts.dmSans(
+                          color: _resendCountdown > 0
+                              ? Colors.grey
+                              : const Color(0xFF3DAB6A),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                if (_localError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: Color(0xFFE05454),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _localError!,
                           style: GoogleFonts.dmSans(
-                              color: _resendCountdown > 0
-                                  ? Colors.grey
-                                  : const Color(0xFF3DAB6A),
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  if (_localError != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline,
-                              color: Color(0xFFE05454), size: 16),
-                          const SizedBox(width: 8),
-                          Text(
-                            _localError!,
-                            style: GoogleFonts.dmSans(
-                              color: const Color(0xFFE05454),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            color: const Color(0xFFE05454),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
-                        ],
-                      ),
-                    ),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isSaving ? null : _verifyAndSave,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2D7A4F),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                        elevation: 0,
-                      ),
-                      child: _isSaving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2.5))
-                          : Text('Verify & Update Password',
-                              style: GoogleFonts.dmSans(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15)),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ]),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _verifyAndSave,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2D7A4F),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                        : Text(
+                      'Verify & Update Password',
+                      style: GoogleFonts.dmSans(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _passField(
-    TextEditingController controller,
-    String label, {
-    String? Function(String?)? validator,
-  }) {
+      TextEditingController controller,
+      String label, {
+        String? Function(String?)? validator,
+      }) {
     return TextFormField(
       controller: controller,
       obscureText: true,
-      style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 15),
+      style: GoogleFonts.dmSans(
+        color: const Color(0xFF1A4731),
+        fontSize: 15,
+      ),
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
@@ -1519,12 +1533,16 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
         filled: true,
         fillColor: const Color(0xFFF7F9F8),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
-        prefixIcon: const Icon(Icons.lock_outline_rounded,
-            color: Color(0xFF3DAB6A), size: 20),
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        prefixIcon: const Icon(
+          Icons.lock_outline_rounded,
+          color: Color(0xFF3DAB6A),
+          size: 20,
+        ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
     );
   }
@@ -1549,6 +1567,7 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
 
   Future<void> _loadFavorites() async {
     setState(() => _isLoading = true);
+
     try {
       final userId = supabaseClient.auth.currentUser?.id;
       if (userId == null) {
@@ -1566,8 +1585,10 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
           .order('created_at', ascending: false);
 
       final result = <RecyclingCenter>[];
+
       for (final row in rows as List) {
-        final station = row['recycling_stations'] as Map<String, dynamic>?;        if (station == null) continue;
+        final station = row['recycling_stations'] as Map<String, dynamic>?;
+        if (station == null) continue;
 
         double? toD(dynamic v) {
           if (v is num) return v.toDouble();
@@ -1581,23 +1602,28 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
         final lng = toD(station['longitude']) ??
             toD(station['location_lng']) ??
             toD(station['lng']);
+
         if (lat == null || lng == null) continue;
 
-        result.add(RecyclingCenter(
-          id: (station['id'] ?? '').toString(),
-          name: (station['name'] ?? '').toString(),
-          address: (station['address'] ?? '').toString(),
-          location: LatLng(lat, lng),
-          phoneNumber: station['phone']?.toString(),
-          isOpen:
-          station['is_open'] == null ? true : station['is_open'] == true,
-        ));
+        result.add(
+          RecyclingCenter(
+            id: (station['id'] ?? '').toString(),
+            name: (station['name'] ?? '').toString(),
+            address: (station['address'] ?? '').toString(),
+            location: LatLng(lat, lng),
+            phoneNumber: station['phone']?.toString(),
+            isOpen:
+            station['is_open'] == null ? true : station['is_open'] == true,
+          ),
+        );
       }
 
-      setState(() {
-        _favorites = result;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _favorites = result;
+          _isLoading = false;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -1618,15 +1644,19 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
     } catch (_) {
       _loadFavorites();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('Failed to remove. Please try again.',
-              style: TextStyle(color: Colors.white)),
-          backgroundColor: const Color(0xFFE05454),
-          behavior: SnackBarBehavior.floating,
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(16),
-        ));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Failed to remove. Please try again.',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: const Color(0xFFE05454),
+            behavior: SnackBarBehavior.floating,
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
       }
     }
   }
@@ -1650,8 +1680,11 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
                   color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white, size: 16),
+                child: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
               ),
             ),
             actions: [
@@ -1664,24 +1697,36 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
                     color: Colors.white.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.refresh_rounded,
-                      color: Colors.white, size: 18),
+                  child: const Icon(
+                    Icons.refresh_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.fromLTRB(56, 0, 56, 16),
               centerTitle: true,
-              title: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.star_rounded,
-                    color: Color(0xFFE8A020), size: 16),
-                const SizedBox(width: 6),
-                Text('Favourite Stations',
+              title: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.star_rounded,
+                    color: Color(0xFFE8A020),
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Favourite Stations',
                     style: GoogleFonts.dmSans(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700)),
-              ]),
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
               background: Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
@@ -1694,9 +1739,13 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
                   alignment: Alignment.bottomLeft,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 52),
-                    child: Text('Your saved recycling spots',
-                        style: GoogleFonts.dmSans(
-                            color: Colors.white60, fontSize: 12)),
+                    child: Text(
+                      'Your saved recycling spots',
+                      style: GoogleFonts.dmSans(
+                        color: Colors.white60,
+                        fontSize: 12,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1705,73 +1754,102 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
           if (_isLoading)
             const SliverFillRemaining(
               child: Center(
-                  child: CircularProgressIndicator(color: Color(0xFF3DAB6A))),
+                child: CircularProgressIndicator(color: Color(0xFF3DAB6A)),
+              ),
             )
           else if (_favorites.isEmpty)
             SliverFillRemaining(
               child: Center(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
                         color: const Color(0xFFFFF3CD),
-                        borderRadius: BorderRadius.circular(26)),
-                    child: const Icon(Icons.star_border_rounded,
-                        color: Color(0xFFE8A020), size: 44),
-                  ),
-                  const SizedBox(height: 20),
-                  Text('No favourites yet',
+                        borderRadius: BorderRadius.circular(26),
+                      ),
+                      child: const Icon(
+                        Icons.star_border_rounded,
+                        color: Color(0xFFE8A020),
+                        size: 44,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'No favourites yet',
                       style: GoogleFonts.dmSans(
-                          color: const Color(0xFF1A4731),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  Text('Tap ⭐ on any station in the map to save it here',
+                        color: const Color(0xFF1A4731),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tap ⭐ on any station in the map to save it here',
                       style: GoogleFonts.dmSans(
-                          color: Colors.grey.shade500, fontSize: 13),
-                      textAlign: TextAlign.center),
-                ]),
+                        color: Colors.grey.shade500,
+                        fontSize: 13,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             )
           else ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                child: Row(children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5EE),
-                        borderRadius: BorderRadius.circular(20)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.star_rounded,
-                          color: Color(0xFFE8A020), size: 13),
-                      const SizedBox(width: 5),
-                      Text(
-                          '${_favorites.length} station${_favorites.length != 1 ? 's' : ''} saved',
-                          style: GoogleFonts.dmSans(
-                              color: const Color(0xFF3DAB6A),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
-                    ]),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5EE),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.star_rounded,
+                              color: Color(0xFFE8A020),
+                              size: 13,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              '${_favorites.length} station${_favorites.length != 1 ? 's' : ''} saved',
+                              style: GoogleFonts.dmSans(
+                                color: const Color(0xFF3DAB6A),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ]),
+                ),
               ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) {
-                    final c = _favorites[i];
-                    return _FavCard(
-                      center: c,
-                      onRemove: () => _removeFavorite(c.id),
-                    );
-                  },
-                  childCount: _favorites.length,
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                        (context, i) {
+                      final c = _favorites[i];
+                      return _FavCard(
+                        center: c,
+                        onRemove: () => _removeFavorite(c.id),
+                      );
+                    },
+                    childCount: _favorites.length,
+                  ),
                 ),
               ),
             ],
@@ -1785,7 +1863,10 @@ class _FavCard extends StatelessWidget {
   final RecyclingCenter center;
   final VoidCallback onRemove;
 
-  const _FavCard({required this.center, required this.onRemove});
+  const _FavCard({
+    required this.center,
+    required this.onRemove,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1796,89 +1877,123 @@ class _FavCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 3))
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
-      child: Column(children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3CD),
-                  borderRadius: BorderRadius.circular(14)),
-              child: const Icon(Icons.recycling_rounded,
-                  color: Color(0xFFE8A020), size: 24),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(center.name,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3CD),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.recycling_rounded,
+                    color: Color(0xFFE8A020),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        center.name,
                         style: GoogleFonts.dmSans(
-                            color: const Color(0xFF1A4731),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700)),
-                    if (center.address.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(center.address,
-                          style: GoogleFonts.dmSans(
-                              color: Colors.grey.shade500, fontSize: 12),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis),
-                    ],
-                    const SizedBox(height: 8),
-                    Row(children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: center.isOpen
-                              ? const Color(0xFFE8F5EE)
-                              : const Color(0xFFFFF0F0),
-                          borderRadius: BorderRadius.circular(8),
+                          color: const Color(0xFF1A4731),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
                         ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(
-                              center.isOpen
-                                  ? Icons.check_circle_outline_rounded
-                                  : Icons.cancel_outlined,
+                      ),
+                      if (center.address.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          center.address,
+                          style: GoogleFonts.dmSans(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
                               color: center.isOpen
-                                  ? const Color(0xFF3DAB6A)
-                                  : const Color(0xFFE05454),
-                              size: 11),
-                          const SizedBox(width: 4),
-                          Text(center.isOpen ? 'Open now' : 'Closed',
-                              style: GoogleFonts.dmSans(
+                                  ? const Color(0xFFE8F5EE)
+                                  : const Color(0xFFFFF0F0),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  center.isOpen
+                                      ? Icons.check_circle_outline_rounded
+                                      : Icons.cancel_outlined,
                                   color: center.isOpen
                                       ? const Color(0xFF3DAB6A)
                                       : const Color(0xFFE05454),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600)),
-                        ]),
+                                  size: 11,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  center.isOpen ? 'Open now' : 'Closed',
+                                  style: GoogleFonts.dmSans(
+                                    color: center.isOpen
+                                        ? const Color(0xFF3DAB6A)
+                                        : const Color(0xFFE05454),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ]),
-                  ]),
+                    ],
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => _confirmRemove(context),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFF3CD),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.star_rounded,
+                      color: Color(0xFFE8A020),
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            GestureDetector(
-              onTap: () => _confirmRemove(context),
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                    color: Color(0xFFFFF3CD), shape: BoxShape.circle),
-                child: const Icon(Icons.star_rounded,
-                    color: Color(0xFFE8A020), size: 20),
-              ),
-            ),
-          ]),
-        ),
-      ]),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1888,16 +2003,24 @@ class _FavCard extends StatelessWidget {
       builder: (_) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Remove Favourite',
-            style: GoogleFonts.dmSans(
-                color: const Color(0xFF1A4731), fontWeight: FontWeight.w700)),
-        content: Text('Remove "${center.name}" from your favourites?',
-            style: GoogleFonts.dmSans(color: Colors.grey.shade600)),
+        title: Text(
+          'Remove Favourite',
+          style: GoogleFonts.dmSans(
+            color: const Color(0xFF1A4731),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'Remove "${center.name}" from your favourites?',
+          style: GoogleFonts.dmSans(color: Colors.grey.shade600),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel',
-                style: GoogleFonts.dmSans(color: Colors.grey.shade500)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.dmSans(color: Colors.grey.shade500),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -1907,12 +2030,17 @@ class _FavCard extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFE05454),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
               elevation: 0,
             ),
-            child: Text('Remove',
-                style: GoogleFonts.dmSans(
-                    color: Colors.white, fontWeight: FontWeight.w600)),
+            child: Text(
+              'Remove',
+              style: GoogleFonts.dmSans(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -1954,7 +2082,11 @@ class AppNotification {
 
 class NotificationsSheet extends StatefulWidget {
   final String userId;
-  const NotificationsSheet({super.key, required this.userId});
+
+  const NotificationsSheet({
+    super.key,
+    required this.userId,
+  });
 
   @override
   State<NotificationsSheet> createState() => _NotificationsSheetState();
@@ -1972,6 +2104,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
 
   Future<void> _load() async {
     setState(() => _isLoading = true);
+
     try {
       final data = await _supabase
           .from('notifications')
@@ -1979,6 +2112,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
           .eq('user_id', widget.userId)
           .order('created_at', ascending: false)
           .limit(50);
+
       if (mounted) {
         setState(() {
           _notifications =
@@ -1986,6 +2120,7 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
           _isLoading = false;
         });
       }
+
       await _supabase
           .from('notifications')
           .update({'is_read': true})
@@ -1997,7 +2132,9 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
   }
 
   Future<void> _deleteOne(String id) async {
-    if (mounted) setState(() => _notifications.removeWhere((n) => n.id == id));
+    if (mounted) {
+      setState(() => _notifications.removeWhere((n) => n.id == id));
+    }
     await _supabase.from('notifications').delete().eq('id', id);
   }
 
@@ -2007,33 +2144,48 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
       builder: (_) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Clear All',
-            style: GoogleFonts.dmSans(
-                color: const Color(0xFF1A4731), fontWeight: FontWeight.w700)),
-        content: Text('Delete all notifications?',
-            style: GoogleFonts.dmSans(color: Colors.grey.shade600)),
+        title: Text(
+          'Clear All',
+          style: GoogleFonts.dmSans(
+            color: const Color(0xFF1A4731),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'Delete all notifications?',
+          style: GoogleFonts.dmSans(color: Colors.grey.shade600),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel',
-                style: GoogleFonts.dmSans(color: Colors.grey.shade500)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.dmSans(color: Colors.grey.shade500),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFE05454),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),
+              ),
               elevation: 0,
             ),
-            child: Text('Clear',
-                style: GoogleFonts.dmSans(
-                    color: Colors.white, fontWeight: FontWeight.w600)),
+            child: Text(
+              'Clear',
+              style: GoogleFonts.dmSans(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
     );
+
     if (confirm != true) return;
+
     if (mounted) setState(() => _notifications.clear());
     await _supabase.from('notifications').delete().eq('user_id', widget.userId);
   }
@@ -2086,195 +2238,265 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
         color: Color(0xFFF0F6F2),
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      child: Column(children: [
-        Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Column(children: [
-            const SizedBox(height: 12),
-            Center(
-              child: Container(
-                width: 36, height: 4,
-                decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(2)),
-              ),
+      child: Column(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-              child: Row(children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                      color: const Color(0xFFE8F0FA),
-                      borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(Icons.notifications_rounded,
-                      color: Color(0xFF4A90D9), size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Notifications', style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 17, fontWeight: FontWeight.w700)),
-                        if (!_isLoading)
-                          Text('${_notifications.length} notification${_notifications.length != 1 ? 's' : ''}', style: GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 12)),
-                      ]),
-                ),
-                if (_notifications.isNotEmpty)
-                  GestureDetector(
-                    onTap: _clearAll,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 7),
-                      decoration: BoxDecoration(
-                          color: const Color(0xFFFFF0F0),
-                          borderRadius: BorderRadius.circular(10)),
-                      child: Text('Clear all',
-                          style: GoogleFonts.dmSans(
-                              color: const Color(0xFFE05454),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-              ]),
-            ),
-          ]),
-        ),
-        Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFF3DAB6A)))
-              : _notifications.isEmpty
-                  ? Center(
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                              color: const Color(0xFFE8F0FA),
-                              borderRadius: BorderRadius.circular(24)),
-                          child: const Icon(Icons.notifications_off_outlined,
-                              color: Color(0xFF4A90D9), size: 38),
-                        ),
-                        const SizedBox(height: 16),
-                        Text('No notifications yet',
-                            style: GoogleFonts.dmSans(
-                                color: const Color(0xFF1A4731),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700)),
-                      ]),
-                    )
-                  : RefreshIndicator(
-                      color: const Color(0xFF3DAB6A),
-                      onRefresh: _load,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                        itemCount: _notifications.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) {
-                          final n = _notifications[i];
-                          final cfg = _typeConfig(n.type);
-                          return Dismissible(
-                            key: Key(n.id),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 20),
-                              decoration: BoxDecoration(
-                                  color: const Color(0xFFE05454),
-                                  borderRadius: BorderRadius.circular(16)),
-                              child: const Icon(Icons.delete_outline,
-                                  color: Colors.white, size: 22),
-                            ),
-                            onDismissed: (_) => _deleteOne(n.id),
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: n.isRead
-                                    ? Colors.white
-                                    : const Color(0xFFF0F8FF),
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                      color: Colors.black.withOpacity(0.04),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2))
-                                ],
-                              ),
-                              child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      width: 42,
-                                      height: 42,
-                                      decoration: BoxDecoration(
-                                          color: cfg['bg'] as Color,
-                                          borderRadius:
-                                              BorderRadius.circular(13)),
-                                      child: Icon(cfg['icon'] as IconData,
-                                          color: cfg['color'] as Color,
-                                          size: 22),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(n.title,
-                                                style: GoogleFonts.dmSans(
-                                                    color:
-                                                        const Color(0xFF1A4731),
-                                                    fontSize: 13,
-                                                    fontWeight: n.isRead
-                                                        ? FontWeight.w600
-                                                        : FontWeight.w700)),
-                                            const SizedBox(height: 4),
-                                            Text(n.body,
-                                                style: GoogleFonts.dmSans(
-                                                    color: Colors.grey.shade500,
-                                                    fontSize: 12),
-                                                maxLines: 2,
-                                                overflow:
-                                                    TextOverflow.ellipsis),
-                                            const SizedBox(height: 6),
-                                            Text(_timeAgo(n.createdAt),
-                                                style: GoogleFonts.dmSans(
-                                                    color: Colors.grey.shade400,
-                                                    fontSize: 11)),
-                                          ]),
-                                    ),
-                                  ]),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                  child: Row(
+                    children: [
                       Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(color: cfg['bg'] as Color, borderRadius: BorderRadius.circular(13)),
-                        child: Icon(cfg['icon'] as IconData, color: cfg['color'] as Color, size: 22),
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F0FA),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.notifications_rounded,
+                          color: Color(0xFF4A90D9),
+                          size: 20,
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(n.title, style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 13, fontWeight: n.isRead ? FontWeight.w600 : FontWeight.w700)),
-                          const SizedBox(height: 4),
-                          Text(n.body, style: GoogleFonts.dmSans(color: Colors.grey.shade500, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
-                          const SizedBox(height: 6),
-                          Text(_timeAgo(n.createdAt), style: GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 11)),
-                        ]),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Notifications',
+                              style: GoogleFonts.dmSans(
+                                color: const Color(0xFF1A4731),
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (!_isLoading)
+                              Text(
+                                '${_notifications.length} notification${_notifications.length != 1 ? 's' : ''}',
+                                style: GoogleFonts.dmSans(
+                                  color: Colors.grey.shade400,
+                                  fontSize: 12,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    ]),
+                      if (_notifications.isNotEmpty)
+                        GestureDetector(
+                          onTap: _clearAll,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF0F0),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              'Clear all',
+                              style: GoogleFonts.dmSans(
+                                color: const Color(0xFFE05454),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                );
-              },
+                ),
+              ],
             ),
           ),
-        ),
-      ]),
+          Expanded(
+            child: _isLoading
+                ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF3DAB6A)),
+            )
+                : _notifications.isEmpty
+                ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F0FA),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: const Icon(
+                      Icons.notifications_off_outlined,
+                      color: Color(0xFF4A90D9),
+                      size: 38,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No notifications yet',
+                    style: GoogleFonts.dmSans(
+                      color: const Color(0xFF1A4731),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            )
+                : RefreshIndicator(
+              color: const Color(0xFF3DAB6A),
+              onRefresh: _load,
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                itemCount: _notifications.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, i) {
+                  final n = _notifications[i];
+                  final cfg = _typeConfig(n.type);
+
+                  return Dismissible(
+                    key: Key(n.id),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE05454),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                    onDismissed: (_) => _deleteOne(n.id),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: n.isRead
+                            ? Colors.white
+                            : const Color(0xFFF0F8FF),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: cfg['bg'] as Color,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              cfg['icon'] as IconData,
+                              color: cfg['color'] as Color,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  n.title,
+                                  style: GoogleFonts.dmSans(
+                                    color: const Color(0xFF1A4731),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  n.body,
+                                  style: GoogleFonts.dmSans(
+                                    color: Colors.grey.shade600,
+                                    fontSize: 12,
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Text(
+                                      _timeAgo(n.createdAt),
+                                      style: GoogleFonts.dmSans(
+                                        color: Colors.grey.shade400,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    if (n.data != null &&
+                                        n.data!['url'] != null) ...[
+                                      const SizedBox(width: 10),
+                                      GestureDetector(
+                                        onTap: () async {
+                                          final url = Uri.tryParse(
+                                            n.data!['url'].toString(),
+                                          );
+                                          if (url != null) {
+                                            await launchUrl(
+                                              url,
+                                              mode: LaunchMode
+                                                  .externalApplication,
+                                            );
+                                          }
+                                        },
+                                        child: Text(
+                                          'Open',
+                                          style: GoogleFonts.dmSans(
+                                            color: const Color(
+                                                0xFF4A90D9),
+                                            fontSize: 11,
+                                            fontWeight:
+                                            FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
