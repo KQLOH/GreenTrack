@@ -117,18 +117,21 @@ class _RecycleScreenState extends State<RecycleScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   List<RecycleRecord> _records = [];
-  List<String> _stations = <String>[];
+  List<RecycleRecord> get _approvedRecords {
+    return _records.where((r) => r.status.toLowerCase() == 'approved').toList();
+  }
+  List<String> _stations = List<String>.from(recyclingStations);
   Map<String, Map<String, double>> _stationCoordinates =
       <String, Map<String, double>>{};
   bool _isLoading = true;
 
-  double get _totalWeight => _records.fold(0, (sum, r) => sum + r.weightKg);
-
-  int get _totalPoints => _records.fold(0, (sum, r) => sum + r.points);
-
+  double get _totalWeight =>
+      _approvedRecords.fold(0, (sum, r) => sum + r.weightKg);
+  int get _totalPoints =>
+      _approvedRecords.fold(0, (sum, r) => sum + r.points);
   Map<String, double> get _categoryWeights {
     final map = <String, double>{};
-    for (final r in _records) {
+    for (final r in _approvedRecords) {
       map[r.category] = (map[r.category] ?? 0) + r.weightKg;
     }
     return map;
