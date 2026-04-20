@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -13,6 +13,7 @@ import '../admin/admin_module_screen.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_client.dart';
 import 'recycle_map_screen.dart';
+import 'redemption_history_screen.dart';
 
 final _supabase = supabaseClient;
 final _authService = AuthService();
@@ -58,6 +59,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final profile =
       await _supabase.from('profiles').select().eq('id', user.id).single();
 
+      // 3. AUTO-SYNC: If Auth email (verified link) is different from Table, update table
       if (user.email != null && profile['email'] != user.email) {
         await _supabase
             .from('profiles')
@@ -425,6 +427,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     size: 14,
                                   ),
                                 ),
+                                child: const Icon(
+                                    Icons.camera_alt_rounded,
+                                    color: Colors.white,
+                                    size: 14),
                               ),
                             ),
                           ],
@@ -489,80 +495,134 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(18, 20, 18, 40),
               sliver: SliverList(
-                delegate: SliverChildListDelegate(
-                  [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 20,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          _statItem(
-                            '${_totalWeight.toStringAsFixed(1)} kg',
-                            'Recycled',
-                          ),
-                          _divider(),
-                          _statItem(
-                            _co2Saved.toStringAsFixed(1),
-                            'CO2 Saved',
-                          ),
-                          _divider(),
-                          _statItem(
-                            _totalPoints.toString(),
-                            'Points',
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    _sectionLabel('Account'),
-                    const SizedBox(height: 10),
-                    _menuGroup(
-                      [
-                        _MenuItem(
-                          icon: Icons.edit_outlined,
-                          iconColor: const Color(0xFFCC8A2E),
-                          emojiColor: const Color(0xFFFFF3E3),
-                          title: 'Edit Profile',
-                          onTap: _showEditProfileSheet,
-                        ),
-                        _MenuItem(
-                          icon: Icons.lock_outline_rounded,
-                          iconColor: const Color(0xFFE8A020),
-                          emojiColor: const Color(0xFFFBF3E3),
-                          title: 'Change Password',
-                          onTap: _showChangePasswordSheet,
-                        ),
-                        _MenuItem(
-                          icon: Icons.notifications_none_rounded,
-                          iconColor: const Color(0xFF4A90D9),
-                          emojiColor: const Color(0xFFE8F0FA),
-                          title: 'Notifications',
-                          badge: _unreadCount > 0 ? _unreadCount : null,
-                          onTap: _openNotifications,
-                        ),
-                        _MenuItem(
-                          icon: Icons.shield_outlined,
-                          iconColor: const Color(0xFFE8A020),
-                          emojiColor: const Color(0xFFFBF3E3),
-                          title: 'Privacy & Security',
-                          onTap: () =>
-                              _showComingSoon('Privacy & Security'),
-                          isLast: true,
-                        ),
-                      ],
+delegate: SliverChildListDelegate(
+  [
+    Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 24,
+        vertical: 20,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _statItem(
+            '${_totalWeight.toStringAsFixed(1)} kg',
+            'Recycled',
+          ),
+          _divider(),
+          _statItem(
+            _co2Saved.toStringAsFixed(1),
+            'CO2 Saved',
+          ),
+          _divider(),
+          _statItem(
+            _totalPoints.toString(),
+            'Points',
+          ),
+        ],
+      ),
+    ),
+    const SizedBox(height: 28),
+    _sectionLabel('Account'),
+    const SizedBox(height: 10),
+    _menuGroup(
+      [
+        _MenuItem(
+          icon: Icons.edit_outlined,
+          iconColor: const Color(0xFFCC8A2E),
+          emojiColor: const Color(0xFFFFF3E3),
+          title: 'Edit Profile',
+          onTap: _showEditProfileSheet,
+        ),
+        _MenuItem(
+          icon: Icons.lock_outline_rounded,
+          iconColor: const Color(0xFFE8A020),
+          emojiColor: const Color(0xFFFBF3E3),
+          title: 'Change Password',
+          onTap: _showChangePasswordSheet,
+        ),
+        _MenuItem(
+          icon: Icons.notifications_none_rounded,
+          iconColor: const Color(0xFF4A90D9),
+          emojiColor: const Color(0xFFE8F0FA),
+          title: 'Notifications',
+          badge: _unreadCount > 0 ? _unreadCount : null,
+          onTap: _openNotifications,
+        ),
+        _MenuItem(
+          icon: Icons.shield_outlined,
+          iconColor: const Color(0xFFE8A020),
+          emojiColor: const Color(0xFFFBF3E3),
+          title: 'Privacy & Security',
+          onTap: () => _showComingSoon('Privacy & Security'),
+          isLast: true,
+        ),
+      ],
+    ),
+    const SizedBox(height: 24),
+    _sectionLabel('Achievements'),
+    const SizedBox(height: 10),
+    _menuGroup(
+      [
+        _MenuItem(
+          icon: Icons.star_rounded,
+          iconColor: const Color(0xFFE8A020),
+          emojiColor: const Color(0xFFFFF3CD),
+          title: 'Favourite Stations',
+          subtitle: 'Your saved recycling spots',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const FavoriteStationsScreen(),
+            ),
+          ),
+        ),
+        _MenuItem(
+          icon: Icons.history_rounded,
+          iconColor: const Color(0xFF3DAB6A),
+          emojiColor: const Color(0xFFE8F5EE),
+          title: 'Impact History',
+          subtitle: 'Joined $joined',
+          onTap: () => _showComingSoon('Impact History'),
+        ),
+        _MenuItem(
+          icon: Icons.confirmation_number_rounded,
+          iconColor: const Color(0xFF2D7A4F),
+          emojiColor: const Color(0xFFF0F6F2),
+          title: 'Redeem History',
+          subtitle: 'Your vouchers and rewards',
+          isLast: true,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const RedemptionHistoryScreen(),
+            ),
+          ),
+        ),
+      ],
+    ),
+    const SizedBox(height: 24),
+    _sectionLabel('App'),
+    const SizedBox(height: 10),
+    _menuGroup(
+      [
+        _MenuItem(
+          icon: Icons.star_border_rounded,
+          iconColor: const Color(0xFFE8A020),
+          emojiColor: const Color(0xFFFFF8E1),
+          title: 'Rate the App',
+          onTap: () => _showComingSoon('Rate the App'),
+        ),
                     ),
                     const SizedBox(height: 24),
                     _sectionLabel('Achievements'),
@@ -897,14 +957,17 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         await _authService.updateEmail(email);
         if (mounted) {
           Navigator.pop(context, true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(
-                    Icons.mark_email_read_outlined,
-                    color: Color(0xFF7EEDB0),
-                    size: 20,
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.mark_email_read_outlined,
+                    color: Color(0xFF7EEDB0), size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Confirmation link sent to $email',
+                    style:
+                    GoogleFonts.dmSans(color: Colors.white, fontSize: 14),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -926,7 +989,14 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
               duration: const Duration(seconds: 4),
             ),
-          );
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF1A4731), // 使用你 Header 的深綠色
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            margin: const EdgeInsets.fromLTRB(
+                20, 0, 20, 40), // 讓它浮起來更高一點，避開 BottomBar
+            duration: const Duration(seconds: 4),
+          ));
         }
       } else {
         if (mounted) {
@@ -957,7 +1027,12 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
               ),
               margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
             ),
-          );
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF7EEDB0), // 使用你等級標籤的亮綠色
+            shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+          ));
         }
       }
     } catch (e) {
@@ -977,7 +1052,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+      EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         decoration: const BoxDecoration(
@@ -1022,7 +1098,6 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
 
                   final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(val);
                   final hasDigit = RegExp(r'[0-9]').hasMatch(val);
-
                   if (!hasLetter || !hasDigit) {
                     return 'Must contain letters and numbers';
                   }
@@ -1677,7 +1752,7 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
               child: Container(
                 margin: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha:0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -1694,7 +1769,7 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
                   margin: const EdgeInsets.fromLTRB(0, 8, 12, 8),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha:0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
