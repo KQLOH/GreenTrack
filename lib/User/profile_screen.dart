@@ -8,9 +8,9 @@ import '../admin/admin_module_screen.dart';
 import '../services/supabase_client.dart';
 import '../services/auth_service.dart';
 import 'recycle_map_screen.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
+import 'redemption_history_screen.dart';
 
 final _supabase = supabaseClient;
 final _authService = AuthService();
@@ -55,12 +55,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // 2. Fetch the profile from the database table
       final profile =
       await _supabase.from('profiles').select().eq('id', user.id).single();
-
-      // 3. AUTO-SYNC: If Auth email (verified link) is different from Table, update table
-      if (user.email != null && profile['email'] != user.email) {
-        await _supabase.from('profiles').update({'email': user.email}).eq('id', user.id);
-        profile['email'] = user.email;
-      }
 
       // 3. AUTO-SYNC: If Auth email (verified link) is different from Table, update table
       if (user.email != null && profile['email'] != user.email) {
@@ -280,24 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
                     child: Column(children: [
                       Row(children: [
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                  color:
-                                  Colors.white.withOpacity(0.2)),
-                            ),
-                            child: const Icon(
-                                Icons.arrow_back_ios_new_rounded,
-                                color: Colors.white,
-                                size: 16),
-                          ),
-                        ),
+                        const SizedBox(width: 38, height: 38),
                         const Spacer(),
                         Text('Profile',
                             style: GoogleFonts.dmSans(
@@ -311,11 +288,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             width: 38,
                             height: 38,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
+                              color: Colors.white.withValues(alpha:0.15),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                  color:
-                                  Colors.white.withOpacity(0.2)),
+                                  color: Colors.white.withValues(alpha:0.2)),
                             ),
                             child: const Icon(Icons.edit_outlined,
                                 color: Colors.white, size: 17),
@@ -335,16 +311,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 borderRadius: BorderRadius.circular(26),
                                 image: avatarUrl != null
                                     ? DecorationImage(
-                                  image: avatarUrl.startsWith('data:image')
-                                      ? MemoryImage(base64Decode(avatarUrl.split(',').last)) as ImageProvider
+                                  image: avatarUrl
+                                      .startsWith('data:image')
+                                      ? MemoryImage(base64Decode(
+                                      avatarUrl
+                                          .split(',')
+                                          .last))
+                                  as ImageProvider
                                       : NetworkImage(avatarUrl),
                                   fit: BoxFit.cover,
                                 )
                                     : null,
                                 boxShadow: [
                                   BoxShadow(
-                                      color: Colors.black
-                                          .withOpacity(0.15),
+                                      color:
+                                      Colors.black.withValues(alpha:0.15),
                                       blurRadius: 16,
                                       offset: const Offset(0, 6))
                                 ],
@@ -356,7 +337,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ? username[0].toUpperCase()
                                       : 'U',
                                   style: GoogleFonts.dmSerifDisplay(
-                                      color: const Color(0xFF1A4731),
+                                      color:
+                                      const Color(0xFF1A4731),
                                       fontSize: 34),
                                 ),
                               )
@@ -374,8 +356,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   color: Color(0xFF3DAB6A),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.camera_alt_rounded,
-                                    color: Colors.white, size: 14),
+                                child: const Icon(
+                                    Icons.camera_alt_rounded,
+                                    color: Colors.white,
+                                    size: 14),
                               ),
                             ),
                           ),
@@ -398,20 +382,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                               color: const Color(0xFF7EEDB0)
-                                  .withOpacity(0.4),
+                                  .withValues(alpha:0.4),
                               width: 1.5),
                         ),
-                        child:
-                        Row(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.eco_rounded,
-                              color: Color(0xFF7EEDB0), size: 15),
-                          const SizedBox(width: 6),
-                          Text('${level['label']} · Lv. ${level['level']}',
-                              style: GoogleFonts.dmSans(
-                                  color: const Color(0xFF7EEDB0),
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600)),
-                        ]),
+                        child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.eco_rounded,
+                                  color: Color(0xFF7EEDB0), size: 15),
+                              const SizedBox(width: 6),
+                              Text(
+                                  '${level['label']} · Lv. ${level['level']}',
+                                  style: GoogleFonts.dmSans(
+                                      color: const Color(0xFF7EEDB0),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600)),
+                            ]),
                       ),
                     ]),
                   ),
@@ -432,7 +418,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha:0.05),
                             blurRadius: 12,
                             offset: const Offset(0, 4))
                       ],
@@ -441,7 +427,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _statItem('${_totalWeight.toStringAsFixed(1)} kg',
                           'Recycled'),
                       _divider(),
-                      _statItem(_co2Saved.toStringAsFixed(1), 'CO2 Saved'),
+                      _statItem(
+                          _co2Saved.toStringAsFixed(1), 'CO2 Saved'),
                       _divider(),
                       _statItem(_totalPoints.toString(), 'Points'),
                     ]),
@@ -500,7 +487,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => const FavoriteStationsScreen()),
+                            builder: (_) =>
+                            const FavoriteStationsScreen()),
                       ),
                     ),
                     _MenuItem(
@@ -511,6 +499,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       subtitle: 'Joined $joined',
                       onTap: () => _showComingSoon('Impact History'),
                       isLast: true,
+                    ),
+                    _MenuItem(
+                      icon: Icons.confirmation_number_rounded, // 票券圖標
+                      iconColor: const Color(0xFF2D7A4F),
+                      emojiColor: const Color(0xFFF0F6F2),
+                      title: 'Redeem History',
+                      subtitle: 'Your vouchers and rewards',
+                      isLast: true, // 記得最後一個要設為 true
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const RedemptionHistoryScreen()),
+                      ),
                     ),
                   ]),
 
@@ -626,7 +626,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha:0.04),
               blurRadius: 10,
               offset: const Offset(0, 3))
         ],
@@ -785,7 +785,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                   child: Text(
                     'Confirmation link sent to $email',
                     style:
-                        GoogleFonts.dmSans(color: Colors.white, fontSize: 14),
+                    GoogleFonts.dmSans(color: Colors.white, fontSize: 14),
                   ),
                 ),
               ],
@@ -793,7 +793,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
             behavior: SnackBarBehavior.floating,
             backgroundColor: const Color(0xFF1A4731), // 使用你 Header 的深綠色
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             margin: const EdgeInsets.fromLTRB(
                 20, 0, 20, 40), // 讓它浮起來更高一點，避開 BottomBar
             duration: const Duration(seconds: 4),
@@ -819,7 +819,7 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
             behavior: SnackBarBehavior.floating,
             backgroundColor: const Color(0xFF7EEDB0), // 使用你等級標籤的亮綠色
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
           ));
         }
@@ -839,7 +839,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+      EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         decoration: const BoxDecoration(
@@ -872,13 +873,15 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                 label: 'Username',
                 icon: Icons.person_outline_rounded,
                 validator: (val) {
-                  if (val == null || val.isEmpty)
+                  if (val == null || val.isEmpty) {
                     return 'Please enter a username';
+                  }
                   if (val.length < 6) return 'At least 6 characters';
                   final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(val);
                   final hasDigit = RegExp(r'[0-9]').hasMatch(val);
-                  if (!hasLetter || !hasDigit)
+                  if (!hasLetter || !hasDigit) {
                     return 'Must contain letters and numbers';
+                  }
                   return null;
                 },
               ),
@@ -904,226 +907,15 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                         borderRadius: BorderRadius.circular(14)),
                   ),
                   child: _isSaving
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Text('Save Changes', style: GoogleFonts.dmSans(color: Colors.white, fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _textField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 15),
-      keyboardType: keyboardType,
-      validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: GoogleFonts.dmSans(color: Colors.grey.shade500),
-        filled: true,
-        fillColor: const Color(0xFFF7F9F8),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF3DAB6A), width: 1.5)),
-        prefixIcon: Icon(icon, color: const Color(0xFF3DAB6A), size: 20),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      ),
-    );
-  }
-}
-
-class ChangePasswordSheet extends StatefulWidget {
-  final String email;
-  const ChangePasswordSheet({super.key, required this.email});
-
-  @override
-  State<ChangePasswordSheet> createState() => _ChangePasswordSheetState();
-}
-
-class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _otpController = TextEditingController();
-  final _passController = TextEditingController();
-  final _confirmController = TextEditingController();
-
-  int _step = 1;
-  bool _isSaving = false;
-  int _resendCountdown = 0;
-  String? _localError;
-  Timer? _timer;
-
-  void _startCountdown() {
-    setState(() => _resendCountdown = 60);
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_resendCountdown > 0) {
-        if (mounted) setState(() => _resendCountdown--);
-      } else {
-        _timer?.cancel();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _otpController.dispose();
-    _passController.dispose();
-    _confirmController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _sendOTP() async {
-    setState(() => _isSaving = true);
-    try {
-      await _supabase.auth.resetPasswordForEmail(widget.email);
-      if (mounted) {
-        setState(() => _step = 2);
-        _startCountdown();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('8-digit code sent to registered address: ${widget.email}'),
-          backgroundColor: const Color(0xFF2D7A4F),
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: const Color(0xFFE05454),
-        ));
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }
-  void _showAppSnackBar(BuildContext context, String message, {required bool isError, required IconData icon}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(
-        children: [
-          Icon(icon, color: isError ? Colors.white : const Color(0xFF1A4731), size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Text(message,
-                  style: GoogleFonts.dmSans(
-                      color: isError ? Colors.white : const Color(0xFF1A4731),
-                      fontWeight: FontWeight.w500
-                  )
-              )
-          ),
-        ],
-      ),
-      behavior: SnackBarBehavior.floating,
-      backgroundColor: isError ? const Color(0xFFE05454) : const Color(0xFF7EEDB0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
-    ));
-  }
-  Future<void> _verifyAndSave() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() {
-      _isSaving = true;
-      _localError = null;
-    });
-
-    try {
-      await _supabase.auth.verifyOTP(
-        email: widget.email,
-        token: _otpController.text.trim(),
-        type: OtpType.recovery,
-      );
-
-      await _authService.updatePassword(_passController.text.trim());
-
-      if (mounted) {
-        Navigator.pop(context);
-
-        _showAppSnackBar(
-            context,
-            'Password updated successfully!',
-            isError: false,
-            icon: Icons.lock_reset_rounded
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          // ❌ 失敗時，不 pop，直接把錯誤訊息寫進變數
-          _localError = 'Invalid or expired code';
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding:
-      EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Form(
-          key: _formKey,
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(2))),
-                ),
-                const SizedBox(height: 20),
-                Text('Change Password',
-                    style: GoogleFonts.dmSans(
-                        color: const Color(0xFF1A4731),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
-                Text('A verification code will be sent to your registered email: ${widget.email}',
-                    style: GoogleFonts.dmSans(
-                        color: Colors.grey.shade600,
-                        fontSize: 13)),
-                const SizedBox(height: 20),
-
-                if (_step == 1) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isSaving ? null : _sendOTP,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2D7A4F),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                        elevation: 0,
-                      ),
-                      child: _isSaving
-                          ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2))
+                      ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
                       : Text('Save Changes',
-                          style: GoogleFonts.dmSans(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600)),
+                      style: GoogleFonts.dmSans(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600)),
                 ),
               ),
             ],
@@ -1158,10 +950,11 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
             borderSide: const BorderSide(color: Color(0xFF3DAB6A), width: 1.5)),
         prefixIcon: Icon(icon, color: const Color(0xFF3DAB6A), size: 20),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
     );
   }
+}
 
 class ChangePasswordSheet extends StatefulWidget {
   final String email;
@@ -1212,7 +1005,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
         _startCountdown();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content:
-              Text('8-digit code sent to registered address: ${widget.email}'),
+          Text('8-digit code sent to registered address: ${widget.email}'),
           backgroundColor: const Color(0xFF2D7A4F),
         ));
       }
@@ -1246,7 +1039,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
       ),
       behavior: SnackBarBehavior.floating,
       backgroundColor:
-          isError ? const Color(0xFFE05454) : const Color(0xFF7EEDB0),
+      isError ? const Color(0xFFE05454) : const Color(0xFF7EEDB0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
     ));
@@ -1291,7 +1084,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         decoration: const BoxDecoration(
@@ -1338,15 +1131,15 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
                       ),
                       child: _isSaving
                           ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2.5))
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2.5))
                           : Text('Send Verification Code',
-                              style: GoogleFonts.dmSans(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15)),
+                          style: GoogleFonts.dmSans(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15)),
                     ),
                   ),
                 ] else ...[
@@ -1366,7 +1159,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
                             height: 45,
                             decoration: BoxDecoration(
                               color: isFilled
-                                  ? const Color(0xFF3DAB6A).withOpacity(0.1)
+                                  ? const Color(0xFF3DAB6A).withValues(alpha:0.1)
                                   : const Color(0xFFF7F9F8),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
@@ -1410,14 +1203,16 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
                     _passController,
                     'New Password',
                     validator: (val) {
-                      if (val == null || val.isEmpty)
+                      if (val == null || val.isEmpty) {
                         return 'Please enter a password';
-                      if (val.length < 6)
+                      }
+                      if (val.length < 6) {
                         return 'Password must be at least 6 characters';
+                      }
                       final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(val);
                       final hasDigit = RegExp(r'[0-9]').hasMatch(val);
                       final hasSymbol =
-                          RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(val);
+                      RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(val);
                       if (!hasLetter || !hasDigit || !hasSymbol) {
                         return 'Must include letters, numbers, and symbols';
                       }
@@ -1485,15 +1280,15 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
                       ),
                       child: _isSaving
                           ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2.5))
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2.5))
                           : Text('Verify & Update Password',
-                              style: GoogleFonts.dmSans(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15)),
+                          style: GoogleFonts.dmSans(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15)),
                     ),
                   ),
                 ],
@@ -1504,10 +1299,10 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
   }
 
   Widget _passField(
-    TextEditingController controller,
-    String label, {
-    String? Function(String?)? validator,
-  }) {
+      TextEditingController controller,
+      String label, {
+        String? Function(String?)? validator,
+      }) {
     return TextFormField(
       controller: controller,
       obscureText: true,
@@ -1524,7 +1319,7 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
         prefixIcon: const Icon(Icons.lock_outline_rounded,
             color: Color(0xFF3DAB6A), size: 20),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
     );
   }
@@ -1567,7 +1362,8 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
 
       final result = <RecyclingCenter>[];
       for (final row in rows as List) {
-        final station = row['recycling_stations'] as Map<String, dynamic>?;        if (station == null) continue;
+        final station = row['recycling_stations'] as Map<String, dynamic>?;
+        if (station == null) continue;
 
         double? toD(dynamic v) {
           if (v is num) return v.toDouble();
@@ -1647,7 +1443,7 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
               child: Container(
                 margin: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha:0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.arrow_back_ios_new_rounded,
@@ -1661,7 +1457,7 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
                   margin: const EdgeInsets.fromLTRB(0, 8, 12, 8),
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha:0.15),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.refresh_rounded,
@@ -1735,43 +1531,44 @@ class _FavoriteStationsScreenState extends State<FavoriteStationsScreen> {
               ),
             )
           else ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                child: Row(children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5EE),
-                        borderRadius: BorderRadius.circular(20)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.star_rounded,
-                          color: Color(0xFFE8A020), size: 13),
-                      const SizedBox(width: 5),
-                      Text(
-                          '${_favorites.length} station${_favorites.length != 1 ? 's' : ''} saved',
-                          style: GoogleFonts.dmSans(
-                              color: const Color(0xFF3DAB6A),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600)),
-                    ]),
-                  ),
-                ]),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                  child: Row(children: [
+                    Container(
+                      padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5EE),
+                          borderRadius: BorderRadius.circular(20)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.star_rounded,
+                            color: Color(0xFFE8A020), size: 13),
+                        const SizedBox(width: 5),
+                        Text(
+                            '${_favorites.length} station${_favorites.length != 1 ? 's' : ''} saved',
+                            style: GoogleFonts.dmSans(
+                                color: const Color(0xFF3DAB6A),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600)),
+                      ]),
+                    ),
+                  ]),
+                ),
               ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) {
-                    final c = _favorites[i];
-                    return _FavCard(
-                      center: c,
-                      onRemove: () => _removeFavorite(c.id),
-                    );
-                  },
-                  childCount: _favorites.length,
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                        (context, i) {
+                      final c = _favorites[i];
+                      return _FavCard(
+                        center: c,
+                        onRemove: () => _removeFavorite(c.id),
+                      );
+                    },
+                    childCount: _favorites.length,
+                  ),
                 ),
               ),
             ],
@@ -1796,7 +1593,7 @@ class _FavCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha:0.05),
               blurRadius: 10,
               offset: const Offset(0, 3))
         ],
@@ -2096,8 +1893,11 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
             const SizedBox(height: 12),
             Center(
               child: Container(
-                width: 36, height: 4,
-                decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(2)),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(2)),
               ),
             ),
             Padding(
@@ -2117,9 +1917,16 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Notifications', style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 17, fontWeight: FontWeight.w700)),
+                        Text('Notifications',
+                            style: GoogleFonts.dmSans(
+                                color: const Color(0xFF1A4731),
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700)),
                         if (!_isLoading)
-                          Text('${_notifications.length} notification${_notifications.length != 1 ? 's' : ''}', style: GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 12)),
+                          Text(
+                              '${_notifications.length} notification${_notifications.length != 1 ? 's' : ''}',
+                              style: GoogleFonts.dmSans(
+                                  color: Colors.grey.shade400, fontSize: 12)),
                       ]),
                 ),
                 if (_notifications.isNotEmpty)
@@ -2144,130 +1951,109 @@ class _NotificationsSheetState extends State<NotificationsSheet> {
         ),
         Expanded(
           child: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFF3DAB6A)))
+              ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF3DAB6A)))
               : _notifications.isEmpty
-                  ? Center(
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                              color: const Color(0xFFE8F0FA),
-                              borderRadius: BorderRadius.circular(24)),
-                          child: const Icon(Icons.notifications_off_outlined,
-                              color: Color(0xFF4A90D9), size: 38),
-                        ),
-                        const SizedBox(height: 16),
-                        Text('No notifications yet',
-                            style: GoogleFonts.dmSans(
-                                color: const Color(0xFF1A4731),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700)),
-                      ]),
-                    )
-                  : RefreshIndicator(
-                      color: const Color(0xFF3DAB6A),
-                      onRefresh: _load,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-                        itemCount: _notifications.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) {
-                          final n = _notifications[i];
-                          final cfg = _typeConfig(n.type);
-                          return Dismissible(
-                            key: Key(n.id),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 20),
-                              decoration: BoxDecoration(
-                                  color: const Color(0xFFE05454),
-                                  borderRadius: BorderRadius.circular(16)),
-                              child: const Icon(Icons.delete_outline,
-                                  color: Colors.white, size: 22),
-                            ),
-                            onDismissed: (_) => _deleteOne(n.id),
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: n.isRead
-                                    ? Colors.white
-                                    : const Color(0xFFF0F8FF),
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                      color: Colors.black.withOpacity(0.04),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2))
-                                ],
-                              ),
-                              child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      width: 42,
-                                      height: 42,
-                                      decoration: BoxDecoration(
-                                          color: cfg['bg'] as Color,
-                                          borderRadius:
-                                              BorderRadius.circular(13)),
-                                      child: Icon(cfg['icon'] as IconData,
-                                          color: cfg['color'] as Color,
-                                          size: 22),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(n.title,
-                                                style: GoogleFonts.dmSans(
-                                                    color:
-                                                        const Color(0xFF1A4731),
-                                                    fontSize: 13,
-                                                    fontWeight: n.isRead
-                                                        ? FontWeight.w600
-                                                        : FontWeight.w700)),
-                                            const SizedBox(height: 4),
-                                            Text(n.body,
-                                                style: GoogleFonts.dmSans(
-                                                    color: Colors.grey.shade500,
-                                                    fontSize: 12),
-                                                maxLines: 2,
-                                                overflow:
-                                                    TextOverflow.ellipsis),
-                                            const SizedBox(height: 6),
-                                            Text(_timeAgo(n.createdAt),
-                                                style: GoogleFonts.dmSans(
-                                                    color: Colors.grey.shade400,
-                                                    fontSize: 11)),
-                                          ]),
-                                    ),
-                                  ]),
-                            ),
-                          );
-                        },
-                      ),
+              ? Center(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                    color: const Color(0xFFE8F0FA),
+                    borderRadius: BorderRadius.circular(24)),
+                child: const Icon(Icons.notifications_off_outlined,
+                    color: Color(0xFF4A90D9), size: 38),
+              ),
+              const SizedBox(height: 16),
+              Text('No notifications yet',
+                  style: GoogleFonts.dmSans(
+                      color: const Color(0xFF1A4731),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700)),
+            ]),
+          )
+              : RefreshIndicator(
+            color: const Color(0xFF3DAB6A),
+            onRefresh: _load,
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              itemCount: _notifications.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (_, i) {
+                final n = _notifications[i];
+                final cfg = _typeConfig(n.type);
+                return Dismissible(
+                  key: Key(n.id),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFFE05454),
+                        borderRadius: BorderRadius.circular(16)),
+                    child: const Icon(Icons.delete_outline,
+                        color: Colors.white, size: 22),
+                  ),
+                  onDismissed: (_) => _deleteOne(n.id),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: n.isRead
+                          ? Colors.white
+                          : const Color(0xFFF0F8FF),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withValues(alpha:0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2))
+                      ],
                     ),
-                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Container(
-                        width: 42, height: 42,
-                        decoration: BoxDecoration(color: cfg['bg'] as Color, borderRadius: BorderRadius.circular(13)),
-                        child: Icon(cfg['icon'] as IconData, color: cfg['color'] as Color, size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(n.title, style: GoogleFonts.dmSans(color: const Color(0xFF1A4731), fontSize: 13, fontWeight: n.isRead ? FontWeight.w600 : FontWeight.w700)),
-                          const SizedBox(height: 4),
-                          Text(n.body, style: GoogleFonts.dmSans(color: Colors.grey.shade500, fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis),
-                          const SizedBox(height: 6),
-                          Text(_timeAgo(n.createdAt), style: GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 11)),
+                    child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                                color: cfg['bg'] as Color,
+                                borderRadius:
+                                BorderRadius.circular(13)),
+                            child: Icon(cfg['icon'] as IconData,
+                                color: cfg['color'] as Color,
+                                size: 22),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                                crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                                children: [
+                                  Text(n.title,
+                                      style: GoogleFonts.dmSans(
+                                          color:
+                                          const Color(0xFF1A4731),
+                                          fontSize: 13,
+                                          fontWeight: n.isRead
+                                              ? FontWeight.w600
+                                              : FontWeight.w700)),
+                                  const SizedBox(height: 4),
+                                  Text(n.body,
+                                      style: GoogleFonts.dmSans(
+                                          color: Colors.grey.shade500,
+                                          fontSize: 12),
+                                      maxLines: 2,
+                                      overflow:
+                                      TextOverflow.ellipsis),
+                                  const SizedBox(height: 6),
+                                  Text(_timeAgo(n.createdAt),
+                                      style: GoogleFonts.dmSans(
+                                          color: Colors.grey.shade400,
+                                          fontSize: 11)),
+                                ]),
+                          ),
                         ]),
-                      ),
-                    ]),
                   ),
                 );
               },

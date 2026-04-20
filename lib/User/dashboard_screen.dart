@@ -1,6 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/supabase_client.dart';
+import 'recycle_screen.dart';
+import 'rewards_screen.dart';
 
 final supabase = supabaseClient;
 
@@ -60,7 +62,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       // Load profile
       final profile = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, total_points')
           .eq('id', user.id)
           .single();
 
@@ -78,7 +80,6 @@ class _DashboardScreenState extends State<DashboardScreen>
 
       double weeklyWeight = 0;
       double monthlyWeight = 0;
-      int totalPoints = 0;
       final List<double> weeklyBars = List.filled(7, 0);
       final Map<String, double> catBreakdown = {};
       final List<Map<String, dynamic>> stations = [];
@@ -86,10 +87,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       for (final r in records as List) {
         final date = DateTime.parse(r['date']);
         final weight = (r['weight_kg'] as num).toDouble();
-        final points = (r['points'] as num?)?.toInt() ?? 0;
         final category = r['category'] as String;
 
-        totalPoints += points;
         catBreakdown[category] = (catBreakdown[category] ?? 0) + weight;
 
         if (!date.isBefore(startOfWeek)) {
@@ -134,10 +133,10 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (mounted) {
         setState(() {
           _username = profile['username'] ?? 'User';
+          _totalPoints = (profile['total_points'] as num?)?.toInt() ?? 0;
           _weeklyWeight = weeklyWeight;
           _monthlyWeight = monthlyWeight;
           _co2Saved = co2;
-          _totalPoints = totalPoints;
           _weeklyBarData = weeklyBars;
           _categoryBreakdown = catBreakdown;
           _stations = stations;
@@ -255,26 +254,48 @@ class _DashboardScreenState extends State<DashboardScreen>
                           ],
                         ),
                       ),
-                      // Points badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.2)),
-                        ),
-                        child: Row(children: [
-                          const Icon(Icons.star_rounded,
-                              color: Color(0xFFFFD700), size: 16),
-                          const SizedBox(width: 5),
-                          Text('$_totalPoints pts',
-                              style: GoogleFonts.dmSans(
+
+                      GestureDetector(
+                        // 1. 這裡必須加上 async
+                        onTap: () async {
+                          // 2. 這裡加上 await，並用 updatedPoints 接收傳回值
+                          final updatedPoints = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => RewardsScreen(currentPoints: _totalPoints),
+                            ),
+                          );
+
+                          // 3. 判斷是否有回傳值，有的話才更新 UI
+                          if (updatedPoints != null && mounted) {
+                            setState(() {
+                              _totalPoints = updatedPoints;
+                            });
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min, // 建議加上這個，防止 Container 撐太開
+                            children: [
+                              const Icon(Icons.star_rounded, color: Color(0xFFFFD700), size: 16),
+                              const SizedBox(width: 5),
+                              Text(
+                                '$_totalPoints pts',
+                                style: GoogleFonts.dmSans(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w700,
-                                  fontSize: 13)),
-                        ]),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 10),
                       // Avatar
@@ -597,7 +618,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           const SizedBox(height: 10),
           Text(
-            '${_monthlyWeight.toStringAsFixed(1)} / ${_monthlyGoal.toStringAsFixed(0)} kg recycled  Â·  ${remaining.toStringAsFixed(1)} kg remaining',
+            '${_monthlyWeight.toStringAsFixed(1)} / ${_monthlyGoal.toStringAsFixed(0)} kg  Â·  ${remaining.toStringAsFixed(1)} kg remaining',
             style: GoogleFonts.dmSans(color: Colors.white60, fontSize: 12),
           ),
         ],
