@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
@@ -13,7 +14,8 @@ import '../admin/admin_module_screen.dart';
 import '../services/auth_service.dart';
 import '../services/supabase_client.dart';
 import 'recycle_map_screen.dart';
-
+import 'impact_history_screen.dart';
+import 'about_greentrack_screen.dart';
 final _supabase = supabaseClient;
 final _authService = AuthService();
 
@@ -193,6 +195,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _showMonthlyGoalSheet() async {
+    final currentGoal =
+        ((_profile?['monthly_goal_kg'] as num?)?.toDouble()) ?? 25.0;
+
+    final result = await showModalBottomSheet<double>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => MonthlyGoalSheet(currentGoal: currentGoal),
+    );
+
+    if (result != null) {
+      setState(() {
+        _profile ??= {};
+        _profile!['monthly_goal_kg'] = result;
+      });
+
+      try {
+        final user = _supabase.auth.currentUser;
+        if (user != null) {
+          await _supabase
+              .from('profiles')
+              .update({'monthly_goal_kg': result}).eq('id', user.id);
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Monthly goal updated successfully!',
+                style: GoogleFonts.dmSans(color: Colors.white),
+              ),
+              backgroundColor: const Color(0xFF2D7A4F),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to save goal. Please try again.',
+                style: GoogleFonts.dmSans(color: Colors.white),
+              ),
+              backgroundColor: const Color(0xFFE05454),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+          await _loadData();
+        }
+      }
+    }
+  }
+
   Future<void> _pickAndUploadAvatar() async {
     final picker = ImagePicker();
     final image = await picker.pickImage(
@@ -276,6 +341,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? DateTime.parse(joinedRaw).toLocal().toString().substring(0, 10)
         : '-';
 
+    // ── Read current goal for display ────────────────────────────────────
+    final monthlyGoal =
+        ((_profile?['monthly_goal_kg'] as num?)?.toDouble()) ?? 25.0;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF0F6F2),
       body: _isLoading
@@ -312,7 +381,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 height: 38,
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius:
+                                  BorderRadius.circular(12),
                                   border: Border.all(
                                     color: Colors.white.withOpacity(0.2),
                                   ),
@@ -341,7 +411,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 height: 38,
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius:
+                                  BorderRadius.circular(12),
                                   border: Border.all(
                                     color: Colors.white.withOpacity(0.2),
                                   ),
@@ -365,19 +436,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 height: 84,
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF7EEDB0),
-                                  borderRadius: BorderRadius.circular(26),
+                                  borderRadius:
+                                  BorderRadius.circular(26),
                                   image: avatarUrl != null
                                       ? DecorationImage(
                                     image: avatarUrl
-                                        .startsWith('data:image')
+                                        .startsWith(
+                                        'data:image')
                                         ? MemoryImage(
                                       base64Decode(
                                         avatarUrl
                                             .split(',')
                                             .last,
                                       ),
-                                    )
-                                    as ImageProvider
+                                    ) as ImageProvider
                                         : NetworkImage(avatarUrl),
                                     fit: BoxFit.cover,
                                   )
@@ -491,6 +563,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               sliver: SliverList(
                 delegate: SliverChildListDelegate(
                   [
+                    // Stats row
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
@@ -527,6 +600,99 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 28),
+
+                    // ── Monthly Goal Card ─────────────────────────
+                    _sectionLabel('Monthly Goal'),
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: _showMonthlyGoalSheet,
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F5EE),
+                                borderRadius: BorderRadius.circular(13),
+                              ),
+                              child: const Icon(
+                                Icons.flag_rounded,
+                                color: Color(0xFF3DAB6A),
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Monthly Recycling Goal',
+                                    style: GoogleFonts.dmSans(
+                                      color: const Color(0xFF1A4731),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Tap to update your target',
+                                    style: GoogleFonts.dmSans(
+                                      color: Colors.grey.shade400,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Current goal badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F5EE),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: const Color(0xFF3DAB6A)
+                                      .withOpacity(0.3),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Text(
+                                '${monthlyGoal % 1 == 0 ? monthlyGoal.toInt() : monthlyGoal.toStringAsFixed(1)} kg',
+                                style: GoogleFonts.dmSans(
+                                  color: const Color(0xFF2D7A4F),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: Colors.grey.shade300,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 28),
                     _sectionLabel('Account'),
                     const SizedBox(height: 10),
                     _menuGroup(
@@ -545,23 +711,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           title: 'Change Password',
                           onTap: _showChangePasswordSheet,
                         ),
-                        _MenuItem(
-                          icon: Icons.notifications_none_rounded,
-                          iconColor: const Color(0xFF4A90D9),
-                          emojiColor: const Color(0xFFE8F0FA),
-                          title: 'Notifications',
-                          badge: _unreadCount > 0 ? _unreadCount : null,
-                          onTap: _openNotifications,
-                        ),
-                        _MenuItem(
-                          icon: Icons.shield_outlined,
-                          iconColor: const Color(0xFFE8A020),
-                          emojiColor: const Color(0xFFFBF3E3),
-                          title: 'Privacy & Security',
-                          onTap: () =>
-                              _showComingSoon('Privacy & Security'),
-                          isLast: true,
-                        ),
+
+
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -589,7 +740,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           emojiColor: const Color(0xFFE8F5EE),
                           title: 'Impact History',
                           subtitle: 'Joined $joined',
-                          onTap: () => _showComingSoon('Impact History'),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ImpactHistoryScreen(),
+                            ),
+                          ),
+
                           isLast: true,
                         ),
                       ],
@@ -599,22 +756,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 10),
                     _menuGroup(
                       [
-                        _MenuItem(
-                          icon: Icons.star_border_rounded,
-                          iconColor: const Color(0xFFE8A020),
-                          emojiColor: const Color(0xFFFFF8E1),
-                          title: 'Rate the App',
-                          onTap: () => _showComingSoon('Rate the App'),
+                       _MenuItem(
+                        icon: Icons.info_outline_rounded,
+                        iconColor: const Color(0xFF4A90D9),
+                        emojiColor: const Color(0xFFE8F0FA),
+                        title: 'About GreenTrack',
+                        subtitle: 'Version 1.0.0',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AboutGreenTrackScreen(),
+                          ),
                         ),
-                        _MenuItem(
-                          icon: Icons.info_outline_rounded,
-                          iconColor: const Color(0xFF4A90D9),
-                          emojiColor: const Color(0xFFE8F0FA),
-                          title: 'About GreenTrack',
-                          subtitle: 'Version 1.0.0',
-                          onTap: () => _showComingSoon('About'),
-                          isLast: true,
-                        ),
+                        isLast: true,
+                      ),
                       ],
                     ),
                     if (_isAdmin) ...[
@@ -738,6 +893,312 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Monthly Goal Bottom Sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+class MonthlyGoalSheet extends StatefulWidget {
+  final double currentGoal;
+
+  const MonthlyGoalSheet({super.key, required this.currentGoal});
+
+  @override
+  State<MonthlyGoalSheet> createState() => _MonthlyGoalSheetState();
+}
+
+class _MonthlyGoalSheetState extends State<MonthlyGoalSheet> {
+  late TextEditingController _controller;
+  final _formKey = GlobalKey<FormState>();
+  bool _isSaving = false;
+  String? _errorText;
+
+  // Quick preset options
+  final List<double> _presets = [5, 10, 15, 20, 25, 30, 50, 100];
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.currentGoal;
+    _controller = TextEditingController(
+      text: initial % 1 == 0
+          ? initial.toInt().toString()
+          : initial.toStringAsFixed(1),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _selectPreset(double value) {
+    setState(() {
+      _controller.text =
+      value % 1 == 0 ? value.toInt().toString() : value.toStringAsFixed(1);
+      _errorText = null;
+    });
+  }
+
+  void _save() {
+    final raw = _controller.text.trim();
+    final value = double.tryParse(raw);
+
+    if (value == null) {
+      setState(() => _errorText = 'Please enter a valid number');
+      return;
+    }
+
+    if (value < 1 || value > 500) {
+      setState(() => _errorText = 'Goal must be between 1 and 500 kg');
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    Navigator.pop(context, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+      EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Header
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5EE),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.flag_rounded,
+                    color: Color(0xFF3DAB6A),
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Monthly Recycling Goal',
+                      style: GoogleFonts.dmSans(
+                        color: const Color(0xFF1A4731),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      'Set your target kg per month',
+                      style: GoogleFonts.dmSans(
+                        color: Colors.grey.shade500,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // Quick presets
+            Text(
+              'QUICK SELECT',
+              style: GoogleFonts.dmSans(
+                color: Colors.grey.shade500,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _presets.map((p) {
+                final currentVal =
+                    double.tryParse(_controller.text.trim()) ?? -1;
+                final isSelected = currentVal == p;
+                return GestureDetector(
+                  onTap: () => _selectPreset(p),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF2D7A4F)
+                          : const Color(0xFFF0F6F2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected
+                            ? const Color(0xFF2D7A4F)
+                            : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      '${p.toInt()} kg',
+                      style: GoogleFonts.dmSans(
+                        color: isSelected
+                            ? Colors.white
+                            : const Color(0xFF1A4731),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 22),
+
+            // Custom input
+            Text(
+              'OR ENTER CUSTOM (KG)',
+              style: GoogleFonts.dmSans(
+                color: Colors.grey.shade500,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _controller,
+              keyboardType:
+              const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+              ],
+              onChanged: (_) => setState(() => _errorText = null),
+              style: GoogleFonts.dmSans(
+                color: const Color(0xFF1A4731),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: InputDecoration(
+                hintText: '25',
+                hintStyle: GoogleFonts.dmSans(color: Colors.grey.shade300),
+                suffixText: 'kg',
+                suffixStyle: GoogleFonts.dmSans(
+                  color: Colors.grey.shade400,
+                  fontSize: 14,
+                ),
+                filled: true,
+                fillColor: const Color(0xFFF7F9F8),
+                errorText: _errorText,
+                errorStyle: GoogleFonts.dmSans(
+                  color: const Color(0xFFE05454),
+                  fontSize: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                  BorderSide(color: Colors.grey.shade200, width: 1.5),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                      color: Color(0xFF3DAB6A), width: 1.5),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                      color: Color(0xFFE05454), width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Save button
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: _isSaving ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2D7A4F),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  elevation: 0,
+                ),
+                child: _isSaving
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2.5),
+                )
+                    : Text(
+                  'Save Goal',
+                  style: GoogleFonts.dmSans(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// dashboard_screen.dart helper — call this to get the goal
+// Add this static method or use it directly in DashboardScreen._loadData()
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// In dashboard_screen.dart, replace:
+//   final double _monthlyGoal = 25.0;
+//
+// With:
+//   double _monthlyGoal = 25.0;
+//
+// And inside _loadData(), after loading the profile, add:
+//   _monthlyGoal = ((profile['monthly_goal_kg'] as num?)?.toDouble()) ?? 25.0;
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The rest of the file below is unchanged from your original
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _MenuItem extends StatelessWidget {
   final IconData icon;
@@ -977,7 +1438,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+      EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         decoration: const BoxDecoration(
@@ -1019,10 +1481,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
                     return 'Please enter a username';
                   }
                   if (val.length < 6) return 'At least 6 characters';
-
                   final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(val);
                   final hasDigit = RegExp(r'[0-9]').hasMatch(val);
-
                   if (!hasLetter || !hasDigit) {
                     return 'Must contain letters and numbers';
                   }
@@ -1105,7 +1565,8 @@ class _EditProfileSheetState extends State<EditProfileSheet> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF3DAB6A), width: 1.5),
+          borderSide:
+          const BorderSide(color: Color(0xFF3DAB6A), width: 1.5),
         ),
         prefixIcon: Icon(icon, color: const Color(0xFF3DAB6A), size: 20),
         contentPadding:
@@ -1168,8 +1629,8 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
         _startCountdown();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-            Text('8-digit code sent to registered address: ${widget.email}'),
+            content: Text(
+                '8-digit code sent to registered address: ${widget.email}'),
             backgroundColor: const Color(0xFF2D7A4F),
           ),
         );
@@ -1218,7 +1679,8 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
         behavior: SnackBarBehavior.floating,
         backgroundColor:
         isError ? const Color(0xFFE05454) : const Color(0xFF7EEDB0),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape:
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         margin: const EdgeInsets.fromLTRB(20, 0, 20, 40),
       ),
     );
@@ -1264,7 +1726,8 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+      EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
         decoration: const BoxDecoration(
@@ -1408,13 +1871,10 @@ class _ChangePasswordSheetState extends State<ChangePasswordSheet> {
                     if (val.length < 6) {
                       return 'Password must be at least 6 characters';
                     }
-
                     final hasLetter = RegExp(r'[a-zA-Z]').hasMatch(val);
                     final hasDigit = RegExp(r'[0-9]').hasMatch(val);
                     final hasSymbol =
-                    RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(val);
-
-                    if (!hasLetter || !hasDigit || !hasSymbol) {
+                    RegExp(r'[!@#$%+=_^&*(),.?":{}|<>]').hasMatch(val);                    if (!hasLetter || !hasDigit || !hasSymbol) {
                       return 'Must include letters, numbers, and symbols';
                     }
                     return null;

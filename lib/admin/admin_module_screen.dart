@@ -1001,6 +1001,16 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
             .update(payload)
             .eq('id', editingReward['id']);
       } else {
+        final rewardName = nameController.text.trim();
+        final slug = rewardName
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+            .replaceAll(RegExp(r'^-+|-+$'), '');
+        payload['code'] =
+        '${slug.isEmpty ? 'reward' : slug}-${DateTime.now().millisecondsSinceEpoch}';
+        payload['provider'] = '';
+        payload['face_value_rm'] = 0;
+        payload['max_per_user'] = 1;
         payload['redeemed_count'] = 0;
         await _supabase.from('admin_rewards').insert(payload);
       }
@@ -1655,9 +1665,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       },
     );
 
-    nameController.dispose();
-    addressController.dispose();
-    phoneController.dispose();
+
 
     if (created == true && mounted) {
       _showSnack(

@@ -23,8 +23,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   double _weeklyWeight = 0;
   double _monthlyWeight = 0;
   double _co2Saved = 0;
-  final double _monthlyGoal = 25.0; // kg target
-  int _totalPoints = 0;
+  double _monthlyGoal = 25.0; // kg target
+   int _totalPoints = 0;
   List<double> _weeklyBarData = List.filled(7, 0);
   Map<String, double> _categoryBreakdown = {};
   List<Map<String, dynamic>> _recentActivity = [];
@@ -58,10 +58,9 @@ class _DashboardScreenState extends State<DashboardScreen>
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      // Load profile
       final profile = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, monthly_goal_kg')
           .eq('id', user.id)
           .single();
 
@@ -85,21 +84,25 @@ class _DashboardScreenState extends State<DashboardScreen>
       final List<Map<String, dynamic>> stations = [];
 
       for (final r in records as List) {
-        final date = DateTime.parse(r['date']);
+        final status = (r['status'] ?? '').toString().toLowerCase();
+        if (status != 'approved') continue;
+
+        final date = DateTime.parse(r['date'].toString());
         final weight = (r['weight_kg'] as num).toDouble();
         final points = (r['points'] as num?)?.toInt() ?? 0;
-        final category = r['category'] as String;
+        final category = (r['category'] ?? '').toString();
 
         totalPoints += points;
         catBreakdown[category] = (catBreakdown[category] ?? 0) + weight;
 
-        if (!date.isBefore(startOfWeek)) {
+        if (!date.isBefore(startOfMonth)) {
           weeklyWeight += weight;
-          final dayIndex = date.weekday - 1; // 0=Mon
+          final dayIndex = date.weekday - 1;
           if (dayIndex >= 0 && dayIndex < 7) {
             weeklyBars[dayIndex] += weight;
           }
         }
+
         if (!date.isBefore(startOfMonth)) {
           monthlyWeight += weight;
         }
@@ -135,6 +138,8 @@ class _DashboardScreenState extends State<DashboardScreen>
       if (mounted) {
         setState(() {
           _username = profile['username'] ?? 'User';
+          _monthlyGoal =
+              ((profile['monthly_goal_kg'] as num?)?.toDouble()) ?? 25.0;
           _weeklyWeight = weeklyWeight;
           _monthlyWeight = monthlyWeight;
           _co2Saved = co2;
@@ -325,8 +330,8 @@ class _DashboardScreenState extends State<DashboardScreen>
               iconColor: const Color(0xFF3DAB6A),
               iconBg: const Color(0xFFDFF5E9),
               label: 'RECYCLED',
-              value: '${_weeklyWeight.toStringAsFixed(1)} kg',
-              sub: 'This week',
+              value: '${_monthlyWeight.toStringAsFixed(1)} kg',
+              sub: 'This month',
             ),
           ),
           const SizedBox(width: 12),
@@ -337,8 +342,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               iconBg: const Color(0xFFFBF3E3),
               label: 'GOAL',
               value:
-              '${(_monthlyWeight / _monthlyGoal * 100).clamp(0, 100).toStringAsFixed(0)}%',
-              sub: 'Monthly target',
+              '${(_monthlyGoal <= 0 ? 0 : (_monthlyWeight / _monthlyGoal * 100)).clamp(0, 100).toStringAsFixed(0)}%',              sub: 'Monthly target',
             ),
           ),
         ]),
@@ -475,7 +479,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   color: Colors.grey.shade400, fontSize: 12)),
           const SizedBox(height: 20),
           SizedBox(
-            height: 100,
+            height: 200,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(7, (i) {
@@ -502,8 +506,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         AnimatedContainer(
                           duration: Duration(milliseconds: 400 + i * 80),
                           curve: Curves.easeOutCubic,
-                          height: 80 * heightFactor,
-                          decoration: BoxDecoration(
+                          height: val > 0 ? (20 + 60 * heightFactor) : 6,                          decoration: BoxDecoration(
                             color: isToday
                                 ? const Color(0xFF2D7A4F)
                                 : val > 0
@@ -538,8 +541,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   // â”€â”€ Monthly Goal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildMonthlyGoal() {
-    final progress = (_monthlyWeight / _monthlyGoal).clamp(0.0, 1.0);
-    final remaining = (_monthlyGoal - _monthlyWeight).clamp(0, double.infinity);
+    final safeGoal = _monthlyGoal <= 0 ? 25.0 : _monthlyGoal;
+    final progress = (_monthlyWeight / safeGoal).clamp(0.0, 1.0);
+    final remaining = (safeGoal - _monthlyWeight).clamp(0, double.infinity);
     final pct = (progress * 100).toStringAsFixed(0);
 
     return Container(
@@ -598,8 +602,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           ),
           const SizedBox(height: 10),
           Text(
-            '${_monthlyWeight.toStringAsFixed(1)} / ${_monthlyGoal.toStringAsFixed(0)} kg recycled  Â·  ${remaining.toStringAsFixed(1)} kg remaining',
-            style: GoogleFonts.dmSans(color: Colors.white60, fontSize: 12),
+            '${_monthlyWeight.toStringAsFixed(1)} / ${safeGoal.toStringAsFixed(1)} kg recycled  ·  ${remaining.toStringAsFixed(1)} kg remaining',            style: GoogleFonts.dmSans(color: Colors.white60, fontSize: 12),
           ),
         ],
       ),
