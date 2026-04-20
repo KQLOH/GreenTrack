@@ -15,14 +15,29 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
   final List<int> _pageRefreshTokens = <int>[0, 0, 0, 0];
+  String? _exploreInitialStationId;
 
   List<Widget> _buildPages() {
     return <Widget>[
-      DashboardScreen(key: ValueKey('dashboard-${_pageRefreshTokens[0]}')),
+      DashboardScreen(
+        key: ValueKey('dashboard-${_pageRefreshTokens[0]}'),
+        onOpenStation: _openExploreForStation,
+      ),
       RecyclePage(key: ValueKey('recycle-${_pageRefreshTokens[1]}')),
-      ExplorePage(key: ValueKey('explore-${_pageRefreshTokens[2]}')),
+      ExplorePage(
+        key: ValueKey('explore-${_pageRefreshTokens[2]}'),
+        initialStationId: _exploreInitialStationId,
+      ),
       ProfilePage(key: ValueKey('profile-${_pageRefreshTokens[3]}')),
     ];
+  }
+
+  void _openExploreForStation(String stationId) {
+    setState(() {
+      _exploreInitialStationId = stationId;
+      _currentIndex = 2;
+      _pageRefreshTokens[2]++;
+    });
   }
 
   @override
@@ -95,11 +110,13 @@ class RecyclePage extends StatelessWidget {
 }
 
 class ExplorePage extends StatelessWidget {
-  const ExplorePage({super.key});
+  const ExplorePage({super.key, this.initialStationId});
+
+  final String? initialStationId;
 
   @override
   Widget build(BuildContext context) {
-    return const RecycleMapScreen();
+    return RecycleMapScreen(initialStationId: initialStationId);
   }
 }
 

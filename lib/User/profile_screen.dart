@@ -17,6 +17,7 @@ import 'recycle_map_screen.dart';
 import 'impact_history_screen.dart';
 import 'about_greentrack_screen.dart';
 import 'redemption_history_screen.dart';
+import 'rewards_screen.dart';
 
 final _supabase = supabaseClient;
 final _authService = AuthService();
@@ -72,15 +73,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       final records = await _supabase
           .from('recycle_records')
-          .select('weight_kg, points')
+          .select('weight_kg')
           .eq('user_id', user.id);
 
       double totalWeight = 0;
-      int totalPoints = 0;
 
       for (final r in records as List) {
         totalWeight += (r['weight_kg'] as num).toDouble();
-        totalPoints += (r['points'] as num?)?.toInt() ?? 0;
       }
 
       final role = (profile['role'] ?? '').toString().toLowerCase();
@@ -103,7 +102,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _isAdmin = isAdminFlag || role == 'admin';
           _totalWeight = totalWeight;
           _co2Saved = totalWeight * 2.5;
-          _totalPoints = totalPoints;
+          _totalPoints = (profile['total_points'] as num?)?.toInt() ?? 0;
           _unreadCount = unreadCount;
           _isLoading = false;
         });
@@ -377,26 +376,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         Row(
                           children: [
-                            GestureDetector(
-                              onTap: () => Navigator.pop(context),
-                              child: Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.15),
-                                  borderRadius:
-                                  BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.2),
-                                  ),
-                                ),
-                                child: const Icon(
-                                  Icons.arrow_back_ios_new_rounded,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                              ),
-                            ),
+                            const SizedBox(width: 38, height: 38),
                             const Spacer(),
                             Text(
                               'Profile',
@@ -721,14 +701,6 @@ delegate: SliverChildListDelegate(
           badge: _unreadCount > 0 ? _unreadCount : null,
           onTap: _openNotifications,
         ),
-        _MenuItem(
-          icon: Icons.shield_outlined,
-          iconColor: const Color(0xFFE8A020),
-          emojiColor: const Color(0xFFFBF3E3),
-          title: 'Privacy & Security',
-          onTap: () => _showComingSoon('Privacy & Security'),
-          isLast: true,
-        ),
       ],
     ),
 
@@ -749,6 +721,26 @@ delegate: SliverChildListDelegate(
               builder: (_) => const FavoriteStationsScreen(),
             ),
           ),
+        ),
+        _MenuItem(
+          icon: Icons.card_giftcard_rounded,
+          iconColor: const Color(0xFF2D7A4F),
+          emojiColor: const Color(0xFFE8F5EE),
+          title: 'Redeem Rewards',
+          subtitle: 'Use your points now',
+          onTap: () {
+            Navigator.push<int>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => RewardsScreen(currentPoints: _totalPoints),
+              ),
+            ).then((updatedPoints) {
+              if (!mounted) return;
+              if (updatedPoints is int) {
+                setState(() => _totalPoints = updatedPoints);
+              }
+            });
+          },
         ),
         _MenuItem(
           icon: Icons.history_rounded,
@@ -785,13 +777,6 @@ delegate: SliverChildListDelegate(
     const SizedBox(height: 10),
     _menuGroup(
       [
-        _MenuItem(
-          icon: Icons.star_border_rounded,
-          iconColor: const Color(0xFFE8A020),
-          emojiColor: const Color(0xFFFFF8E1),
-          title: 'Rate the App',
-          onTap: () => _showComingSoon('Rate the App'),
-        ),
         _MenuItem(
           icon: Icons.info_outline_rounded,
           iconColor: const Color(0xFF4A90D9),
