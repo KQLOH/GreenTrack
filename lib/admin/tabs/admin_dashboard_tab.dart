@@ -173,6 +173,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
         borderRadius: BorderRadius.circular(14),
         onTap: () => setState(() => selectedSection = section),
         child: Ink(
+          height: 100, // 👈 固定高度
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           decoration: BoxDecoration(
             color: isSelected ? color.withValues(alpha: 0.1) : Colors.white,

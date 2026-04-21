@@ -8,7 +8,9 @@ class AdminUsersTab extends StatefulWidget {
     required this.totalUsers,
     required this.totalAdmins,
     required this.searchQuery,
+    required this.roleFilter,
     required this.onSearchChanged,
+    required this.onRoleFilterChanged,
     required this.isUpdatingUser,
     required this.onToggleAdmin,
     required this.onEditUser,
@@ -20,10 +22,12 @@ class AdminUsersTab extends StatefulWidget {
   final int totalUsers;
   final int totalAdmins;
   final String searchQuery;
+  final String roleFilter;
   final ValueChanged<String> onSearchChanged;
+  final ValueChanged<String> onRoleFilterChanged;
   final bool isUpdatingUser;
   final Future<void> Function(Map<String, dynamic> user, bool isAdmin)
-      onToggleAdmin;
+  onToggleAdmin;
   final Future<void> Function(Map<String, dynamic> user) onEditUser;
   final Future<void> Function(Map<String, dynamic> user) onDeleteUser;
   final Future<void> Function() onRefresh;
@@ -80,29 +84,57 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _searchController,
-            onChanged: widget.onSearchChanged,
-            decoration: InputDecoration(
-              hintText: 'Search by username, email, or role',
-              prefixIcon: const Icon(Icons.search_rounded),
-              filled: true,
-              fillColor: Colors.white,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFFE3EEE6)),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: widget.onSearchChanged,
+                  decoration: InputDecoration(
+                    hintText: 'Search by username, email, or role',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide:
+                      const BorderSide(color: Color(0xFFE3EEE6)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide:
+                      const BorderSide(color: Color(0xFFE3EEE6)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide:
+                      const BorderSide(color: _primary, width: 1.2),
+                    ),
+                  ),
+                ),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: Color(0xFFE3EEE6)),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _openRoleFilterSheet,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _ink,
+                  side: const BorderSide(color: Color(0xFFD4E6D8)),
+                  backgroundColor:
+                  widget.roleFilter == 'all' ? Colors.white : const Color(0xFFE8F5EE),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                ),
+                icon: const Icon(Icons.tune_rounded, size: 18),
+                label: Text(_roleLabel(widget.roleFilter)),
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: _primary, width: 1.2),
-              ),
-            ),
+            ],
           ),
           const SizedBox(height: 12),
           if (widget.users.isEmpty)
@@ -196,7 +228,7 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
                                 : () => widget.onToggleAdmin(user, !isAdmin),
                             style: TextButton.styleFrom(
                               foregroundColor:
-                                  isAdmin ? const Color(0xFFE05454) : _primary,
+                              isAdmin ? const Color(0xFFE05454) : _primary,
                             ),
                             icon: Icon(
                               isAdmin
@@ -218,6 +250,64 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
         ],
       ),
     );
+  }
+
+  Future<void> _openRoleFilterSheet() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _roleFilterOption(sheetContext, 'all', 'All roles'),
+              _roleFilterOption(sheetContext, 'admin', 'Admin only'),
+              _roleFilterOption(sheetContext, 'user', 'User only'),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selected != null && selected != widget.roleFilter) {
+      widget.onRoleFilterChanged(selected);
+    }
+  }
+
+  Widget _roleFilterOption(BuildContext sheetContext, String value, String label) {
+    final selected = widget.roleFilter == value;
+    return ListTile(
+      onTap: () => Navigator.pop(sheetContext, value),
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        selected ? Icons.radio_button_checked : Icons.radio_button_off,
+        color: selected ? _primary : Colors.grey.shade500,
+      ),
+      title: Text(
+        label,
+        style: GoogleFonts.dmSans(
+          color: _ink,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  String _roleLabel(String filter) {
+    switch (filter) {
+      case 'admin':
+        return 'Admin';
+      case 'user':
+        return 'User';
+      default:
+        return 'Filter';
+    }
   }
 
   Widget _sectionHeader({
@@ -257,11 +347,11 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
   }
 
   Widget _chip(
-    IconData icon,
-    String text,
-    Color bg,
-    Color fg,
-  ) {
+      IconData icon,
+      String text,
+      Color bg,
+      Color fg,
+      ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(

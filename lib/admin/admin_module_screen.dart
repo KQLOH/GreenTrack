@@ -18,6 +18,110 @@ class AdminModuleScreen extends StatefulWidget {
   State<AdminModuleScreen> createState() => _AdminModuleScreenState();
 }
 
+Future<bool?> showDeleteConfirmDialog(
+    BuildContext context, {
+      required String title,
+      required String message,
+      String confirmText = 'Delete',
+    }) {
+  return showDialog<bool>(
+    context: context,
+    builder: (dialogContext) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF0F0),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Color(0xFFE05454),
+                  size: 30,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.dmSans(
+                  color: const Color(0xFF1A4731),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.dmSans(
+                  color: Colors.grey.shade600,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF1A4731),
+                        side: const BorderSide(color: Color(0xFFD4E6D8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(dialogContext, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE05454),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: 0,
+                      ),
+                      child: Text(confirmText),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
 class _AdminModuleScreenState extends State<AdminModuleScreen>
     with SingleTickerProviderStateMixin {
   static const Color _bg = Color(0xFFF4FAF4);
@@ -42,7 +146,12 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
   String? _rewardsLoadError;
   LatLng _selectedStationPoint = _melakaCenter;
   String _userSearchQuery = '';
+  String _userRoleFilter = 'all';
   String _recordSearchQuery = '';
+  String _recordDateFilter = 'all';
+  String _recordStatusFilter = 'all';
+  String _recordTypeFilter = 'all';
+  String _recordStationFilter = 'all';
 
   List<Map<String, dynamic>> _users = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _records = <Map<String, dynamic>>[];
@@ -143,37 +252,105 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
 
   List<Map<String, dynamic>> get _filteredUsers {
     final query = _userSearchQuery.trim().toLowerCase();
-    if (query.isEmpty) return _users;
-
     return _users.where((user) {
       final username = (user['username'] ?? '').toString().toLowerCase();
       final email = (user['email'] ?? '').toString().toLowerCase();
       final role = (user['role'] ?? '').toString().toLowerCase();
-      return username.contains(query) ||
+      final isAdmin = user['is_admin'] == true || role == 'admin';
+
+      final matchesRole = _userRoleFilter == 'all' ||
+          (_userRoleFilter == 'admin' && isAdmin) ||
+          (_userRoleFilter == 'user' && !isAdmin);
+      final matchesQuery = query.isEmpty ||
+          username.contains(query) ||
           email.contains(query) ||
           role.contains(query);
+
+      return matchesRole && matchesQuery;
     }).toList();
   }
 
   List<Map<String, dynamic>> get _filteredRecords {
     final query = _recordSearchQuery.trim().toLowerCase();
-    if (query.isEmpty) return _records;
-
     return _records.where((record) {
       final category = (record['category'] ?? '').toString().toLowerCase();
       final station = (record['station'] ?? '').toString().toLowerCase();
       final status = (record['status'] ?? '').toString().toLowerCase();
       final submittedBy = (record['submitted_user'] ??
-              record['user_email'] ??
-              record['user_id'] ??
-              '')
+          record['user_email'] ??
+          record['user_id'] ??
+          '')
           .toString()
           .toLowerCase();
-      return category.contains(query) ||
+
+      final matchesDate = _recordMatchesDateFilter(record);
+      final matchesStatus =
+          _recordStatusFilter == 'all' || status == _recordStatusFilter;
+      final matchesType = _recordTypeFilter == 'all' ||
+          (record['category'] ?? '').toString() == _recordTypeFilter;
+      final matchesStation = _recordStationFilter == 'all' ||
+          (record['station'] ?? '').toString() == _recordStationFilter;
+      final matchesQuery = query.isEmpty ||
+          category.contains(query) ||
           station.contains(query) ||
           status.contains(query) ||
           submittedBy.contains(query);
+
+      return matchesDate &&
+          matchesStatus &&
+          matchesType &&
+          matchesStation &&
+          matchesQuery;
     }).toList();
+  }
+
+  bool _recordMatchesDateFilter(Map<String, dynamic> record) {
+    if (_recordDateFilter == 'all') return true;
+
+    final raw = (record['created_at'] ?? record['date'])?.toString();
+    if (raw == null || raw.isEmpty) return false;
+
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return false;
+
+    final now = DateTime.now();
+    final local = parsed.toLocal();
+
+    if (_recordDateFilter == 'today') {
+      return local.year == now.year &&
+          local.month == now.month &&
+          local.day == now.day;
+    }
+
+    if (_recordDateFilter == '7days') {
+      return !local.isBefore(now.subtract(const Duration(days: 7)));
+    }
+
+    if (_recordDateFilter == '30days') {
+      return !local.isBefore(now.subtract(const Duration(days: 30)));
+    }
+
+    return true;
+  }
+
+  List<String> get _recordTypeFilterOptions {
+    final set = _records
+        .map((record) => (record['category'] ?? '').toString().trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList();
+    set.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return set;
+  }
+
+  List<String> get _recordStationFilterOptions {
+    final set = _records
+        .map((record) => (record['station'] ?? '').toString().trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .toList();
+    set.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return set;
   }
 
   Future<void> _loadRecords() async {
@@ -193,7 +370,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
           .toList();
 
       Map<String, Map<String, dynamic>> profilesById =
-          <String, Map<String, dynamic>>{};
+      <String, Map<String, dynamic>>{};
       if (userIds.isNotEmpty) {
         try {
           final profileRows = await _supabase
@@ -201,7 +378,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
               .select('id, username, email')
               .inFilter('id', userIds);
           for (final profile
-              in List<Map<String, dynamic>>.from(profileRows as List)) {
+          in List<Map<String, dynamic>>.from(profileRows as List)) {
             final id = profile['id']?.toString();
             if (id != null && id.isNotEmpty) {
               profilesById[id] = profile;
@@ -218,7 +395,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
         return {
           ...row,
           'submitted_user':
-              profile?['username'] ?? profile?['email'] ?? row['user_id'],
+          profile?['username'] ?? profile?['email'] ?? row['user_id'],
           'user_email': profile?['email'],
         };
       }).toList();
@@ -255,18 +432,18 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     } catch (error) {
       _rewards = <Map<String, dynamic>>[];
       _rewardsLoadError =
-          'Rewards table unavailable. Create table "admin_rewards" to manage rewards.';
+      'Rewards table unavailable. Create table "admin_rewards" to manage rewards.';
       debugPrint('Rewards load error: $error');
       return;
     }
 
     try {
       final redemptionRows =
-          await _supabase.from('reward_redemptions').select('quantity');
+      await _supabase.from('reward_redemptions').select('quantity');
 
       int total = 0;
       for (final row
-          in List<Map<String, dynamic>>.from(redemptionRows as List)) {
+      in List<Map<String, dynamic>>.from(redemptionRows as List)) {
         total += (row['quantity'] as num?)?.toInt() ?? 1;
       }
       _totalRedemptions = total;
@@ -278,9 +455,9 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
   }
 
   Future<void> _moderatePendingRecord(
-    Map<String, dynamic> record,
-    bool approved,
-  ) async {
+      Map<String, dynamic> record,
+      bool approved,
+      ) async {
     final recordId = record['id'] ?? record['record_id'];
     final idColumn = record['id'] != null ? 'id' : 'record_id';
     if (recordId == null) {
@@ -292,14 +469,14 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       // 1. 更新 record 状态（approve 同时给积分）
       final updateData = approved
           ? {
-              'status': 'approved',
-              'approved_at': DateTime.now().toIso8601String(),
-              'points': _calcPoints(record),
-            }
+        'status': 'approved',
+        'approved_at': DateTime.now().toIso8601String(),
+        'points': _calcPoints(record),
+      }
           : {
-              'status': 'rejected',
-              'rejection_reason': _rejectionReason,
-            };
+        'status': 'rejected',
+        'rejection_reason': _rejectionReason,
+      };
 
       final updated = await _supabase
           .from('recycle_records')
@@ -332,7 +509,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
               'type': 'approved',
               'title': 'Record Approved ✅',
               'body':
-                  'Your ${weight}kg $category recycling record has been approved! You earned $points points.',
+              'Your ${weight}kg $category recycling record has been approved! You earned $points points.',
               'is_read': false,
             });
           } else {
@@ -341,7 +518,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
               'type': 'rejected',
               'title': 'Record Rejected ❌',
               'body':
-                  'Your ${weight}kg $category recycling record was not approved. Please ensure you are physically present at the station.',
+              'Your ${weight}kg $category recycling record was not approved. Please ensure you are physically present at the station.',
               'is_read': false,
             });
           }
@@ -361,11 +538,11 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       _showSnack(
         approved
             ? (notificationFailed
-                ? 'Record approved. Notification not sent (RLS policy).'
-                : 'Record approved.')
+            ? 'Record approved. Notification not sent (RLS policy).'
+            : 'Record approved.')
             : (notificationFailed
-                ? 'Record rejected. Notification not sent (RLS policy).'
-                : 'Record rejected.'),
+            ? 'Record rejected. Notification not sent (RLS policy).'
+            : 'Record rejected.'),
         isError: false,
       );
     } catch (error) {
@@ -435,9 +612,9 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     }
 
     final nameController =
-        TextEditingController(text: user['username']?.toString() ?? '');
+    TextEditingController(text: user['username']?.toString() ?? '');
     final emailController =
-        TextEditingController(text: user['email']?.toString() ?? '');
+    TextEditingController(text: user['email']?.toString() ?? '');
     final pointsController = TextEditingController(
       text: (user['total_points'] ?? 0).toString(),
     );
@@ -575,32 +752,12 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     }
 
     final name = (user['username'] ?? user['email'] ?? 'this user').toString();
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(
-          'Delete User',
-          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          'Delete $name from profiles? This cannot be undone.',
-          style: GoogleFonts.dmSans(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE05454),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+
+    final result = await showDeleteConfirmDialog(
+      context,
+      title: 'Delete User',
+      message: 'Delete $name from profiles? This action cannot be undone.',
+      confirmText: 'Delete',
     );
 
     if (result != true) return;
@@ -632,14 +789,14 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     }
 
     final typeController =
-        TextEditingController(text: (record['category'] ?? '').toString());
+    TextEditingController(text: (record['category'] ?? '').toString());
     final weightController = TextEditingController(
       text: ((record['weight_kg'] as num?)?.toDouble() ?? 0).toString(),
     );
     final stationController =
-        TextEditingController(text: (record['station'] ?? '').toString());
+    TextEditingController(text: (record['station'] ?? '').toString());
     final statusController =
-        TextEditingController(text: (record['status'] ?? 'pending').toString());
+    TextEditingController(text: (record['status'] ?? 'pending').toString());
 
     final saved = await showModalBottomSheet<bool>(
       context: context,
@@ -683,7 +840,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
                   label: 'Weight (kg)',
                   hint: '0.0',
                   keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  const TextInputType.numberWithOptions(decimal: true),
                 ),
                 const SizedBox(height: 10),
                 _buildInputField(
@@ -865,108 +1022,126 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Padding(
+          builder: (modalContext, setSheetState) {
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
               padding: EdgeInsets.only(
                 left: 16,
                 right: 16,
                 top: 12,
                 bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 16,
               ),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isEditing ? 'Edit Reward' : 'Add Reward',
-                      style: GoogleFonts.dmSans(
-                        color: _ink,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildInputField(
-                      controller: nameController,
-                      label: 'Reward Name',
-                      hint: 'TNG RM5 Reload PIN',
-                    ),
-                    const SizedBox(height: 10),
-                    _buildInputField(
-                      controller: descriptionController,
-                      label: 'Description',
-                      hint: 'Digital reload voucher',
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 10),
-                    _buildInputField(
-                      controller: pointsController,
-                      label: 'Points Required',
-                      hint: '500',
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 10),
-                    _buildInputField(
-                      controller: quantityController,
-                      label: 'Available Quantity',
-                      hint: '100',
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile.adaptive(
-                      contentPadding: EdgeInsets.zero,
-                      value: isActive,
-                      activeThumbColor: _primary,
-                      activeTrackColor: _primary.withValues(alpha: 0.35),
-                      title: Text(
-                        'Reward is active',
-                        style: GoogleFonts.dmSans(
-                          color: _ink,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      onChanged: (value) {
-                        setSheetState(() => isActive = value);
-                      },
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(sheetContext, false),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: _ink,
-                              side: const BorderSide(color: Color(0xFFD4E6D8)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+              child: SafeArea(
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(sheetContext).size.height * 0.9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isEditing ? 'Edit Reward' : 'Add Reward',
+                                style: GoogleFonts.dmSans(
+                                  color: _ink,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
-                            ),
-                            child: const Text('Cancel'),
+                              const SizedBox(height: 10),
+                              _buildInputField(
+                                controller: nameController,
+                                label: 'Reward Name',
+                                hint: 'TNG RM5 Reload PIN',
+                              ),
+                              const SizedBox(height: 8),
+                              _buildInputField(
+                                controller: descriptionController,
+                                label: 'Description',
+                                hint: 'Digital reload voucher',
+                                maxLines: 2,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildInputField(
+                                controller: pointsController,
+                                label: 'Points Required',
+                                hint: '500',
+                                keyboardType: TextInputType.number,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildInputField(
+                                controller: quantityController,
+                                label: 'Available Quantity',
+                                hint: '100',
+                                keyboardType: TextInputType.number,
+                              ),
+                              const SizedBox(height: 6),
+                              SwitchListTile.adaptive(
+                                contentPadding: EdgeInsets.zero,
+                                value: isActive,
+                                activeThumbColor: _primary,
+                                activeTrackColor: _primary.withValues(alpha: 0.35),
+                                title: Text(
+                                  'Reward is active',
+                                  style: GoogleFonts.dmSans(
+                                    color: _ink,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                onChanged: (value) {
+                                  setSheetState(() => isActive = value);
+                                },
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => Navigator.pop(sheetContext, true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _primary,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.pop(sheetContext, false),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: _ink,
+                                  side: const BorderSide(color: Color(0xFFD4E6D8)),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text('Cancel'),
                               ),
                             ),
-                            child: Text(isEditing ? 'Update' : 'Add'),
-                          ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.pop(sheetContext, true),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _primary,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: Text(isEditing ? 'Update' : 'Add'),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -994,6 +1169,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     if (mounted) {
       setState(() => _isSavingReward = true);
     }
+
     try {
       if (isEditing) {
         await _supabase
@@ -1006,19 +1182,25 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
             .toLowerCase()
             .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
             .replaceAll(RegExp(r'^-+|-+$'), '');
+
         payload['code'] =
         '${slug.isEmpty ? 'reward' : slug}-${DateTime.now().millisecondsSinceEpoch}';
         payload['provider'] = '';
         payload['face_value_rm'] = 0;
         payload['max_per_user'] = 1;
         payload['redeemed_count'] = 0;
+
         await _supabase.from('admin_rewards').insert(payload);
       }
+
       await _loadRewards();
       if (!mounted) return;
+
       setState(() {});
-      _showSnack(isEditing ? 'Reward updated.' : 'Reward added.',
-          isError: false);
+      _showSnack(
+        isEditing ? 'Reward updated.' : 'Reward added.',
+        isError: false,
+      );
     } catch (error) {
       _showSnack(
         isEditing ? 'Failed to update reward.' : 'Failed to add reward.',
@@ -1030,6 +1212,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       descriptionController.dispose();
       pointsController.dispose();
       quantityController.dispose();
+
       if (mounted) {
         setState(() => _isSavingReward = false);
       }
@@ -1138,7 +1321,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     } catch (error) {
       _stations = <Map<String, dynamic>>[];
       _stationsLoadError =
-          'Station table unavailable. Create table "recycling_stations" to manage stations.';
+      'Station table unavailable. Create table "recycling_stations" to manage stations.';
       debugPrint('Station load error: $error');
     }
   }
@@ -1151,7 +1334,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     }
 
     final currentIsOpen =
-        station['is_open'] == null ? true : station['is_open'] == true;
+    station['is_open'] == null ? true : station['is_open'] == true;
     final nextIsOpen = !currentIsOpen;
 
     if (mounted) {
@@ -1188,7 +1371,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
           style: GoogleFonts.dmSans(color: Colors.white),
         ),
         backgroundColor:
-            isError ? const Color(0xFFE05454) : const Color(0xFF2D7A4F),
+        isError ? const Color(0xFFE05454) : const Color(0xFF2D7A4F),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -1401,7 +1584,7 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     final isEditing = editingStation != null;
 
     final nameController =
-        TextEditingController(text: editingStation?['name']?.toString() ?? '');
+    TextEditingController(text: editingStation?['name']?.toString() ?? '');
     final addressController = TextEditingController(
       text: editingStation?['address']?.toString() ?? '',
     );
@@ -1482,15 +1665,15 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
                                     initialZoom: 14,
                                     onTap: (_, point) {
                                       setModalState(
-                                          () => selectedPoint = point);
+                                              () => selectedPoint = point);
                                     },
                                   ),
                                   children: [
                                     TileLayer(
                                       urlTemplate:
-                                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                      'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                                       userAgentPackageName:
-                                          'com.example.system_green_track',
+                                      'com.example.system_green_track',
                                     ),
                                     MarkerLayer(
                                       markers: [
@@ -1523,8 +1706,8 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
                             const SizedBox(height: 10),
                             Text(
                               'Selected: '
-                              '${selectedPoint.latitude.toStringAsFixed(6)}, '
-                              '${selectedPoint.longitude.toStringAsFixed(6)}',
+                                  '${selectedPoint.latitude.toStringAsFixed(6)}, '
+                                  '${selectedPoint.longitude.toStringAsFixed(6)}',
                               style: GoogleFonts.dmSans(
                                 color: const Color(0xFF4A90D9),
                                 fontWeight: FontWeight.w600,
@@ -1581,68 +1764,68 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
                               onPressed: _isSavingStation
                                   ? null
                                   : () async {
-                                      final name = nameController.text.trim();
-                                      final address =
-                                          addressController.text.trim();
-                                      final phone = phoneController.text.trim();
+                                final name = nameController.text.trim();
+                                final address =
+                                addressController.text.trim();
+                                final phone = phoneController.text.trim();
 
-                                      if (name.isEmpty || address.isEmpty) {
-                                        _showSnack(
-                                          'Please fill station name and address.',
-                                          isError: true,
-                                        );
-                                        return;
-                                      }
+                                if (name.isEmpty || address.isEmpty) {
+                                  _showSnack(
+                                    'Please fill station name and address.',
+                                    isError: true,
+                                  );
+                                  return;
+                                }
 
-                                      setState(() => _isSavingStation = true);
-                                      final navigator = Navigator.of(context);
-                                      final ok = isEditing
-                                          ? await _updateStation(
-                                              station: editingStation,
-                                              name: name,
-                                              address: address,
-                                              phone: phone,
-                                              point: selectedPoint,
-                                            )
-                                          : await _insertStation(
-                                              name: name,
-                                              address: address,
-                                              phone: phone,
-                                              point: selectedPoint,
-                                            );
-                                      if (!mounted) return;
-                                      setState(() => _isSavingStation = false);
+                                setState(() => _isSavingStation = true);
+                                final navigator = Navigator.of(context);
+                                final ok = isEditing
+                                    ? await _updateStation(
+                                  station: editingStation,
+                                  name: name,
+                                  address: address,
+                                  phone: phone,
+                                  point: selectedPoint,
+                                )
+                                    : await _insertStation(
+                                  name: name,
+                                  address: address,
+                                  phone: phone,
+                                  point: selectedPoint,
+                                );
+                                if (!mounted) return;
+                                setState(() => _isSavingStation = false);
 
-                                      if (ok) {
-                                        _selectedStationPoint = selectedPoint;
-                                        await _loadStations();
-                                        if (!mounted) return;
-                                        navigator.pop(true);
-                                      } else {
-                                        _showSnack(
-                                          isEditing
-                                              ? 'Failed to update station.'
-                                              : 'Failed to add station. Check table columns for coordinates.',
-                                          isError: true,
-                                        );
-                                      }
-                                    },
+                                if (ok) {
+                                  _selectedStationPoint = selectedPoint;
+                                  await _loadStations();
+                                  if (!mounted) return;
+                                  navigator.pop(true);
+                                } else {
+                                  _showSnack(
+                                    isEditing
+                                        ? 'Failed to update station.'
+                                        : 'Failed to add station. Check table columns for coordinates.',
+                                    isError: true,
+                                  );
+                                }
+                              },
                               icon: _isSavingStation
                                   ? const SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
                                   : const Icon(Icons.add_rounded, size: 16),
                               label: Text(
                                 _isSavingStation
                                     ? 'Saving...'
                                     : (isEditing
-                                        ? 'Update Station'
-                                        : 'Save Station'),
+                                    ? 'Update Station'
+                                    : 'Save Station'),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _primary,
@@ -1764,93 +1947,115 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(color: _primary),
-            )
+        child: CircularProgressIndicator(color: _primary),
+      )
           : TabBarView(
-              controller: _tabController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                AdminDashboardTab(
-                  users: _users,
-                  records: _records,
-                  pendingRecords: _pendingRecords,
-                  stations: _stations,
-                  onRefresh: _loadAllData,
-                  onModerateRecord: _moderatePendingRecord,
-                ),
-                AdminUsersTab(
-                  users: _filteredUsers,
-                  totalUsers: _users.length,
-                  totalAdmins: _users.where((user) {
-                    final role = (user['role'] ?? '').toString().toLowerCase();
-                    return role == 'admin' || user['is_admin'] == true;
-                  }).length,
-                  searchQuery: _userSearchQuery,
-                  onSearchChanged: (value) {
-                    setState(() => _userSearchQuery = value);
-                  },
-                  isUpdatingUser: _isUpdatingUser,
-                  onToggleAdmin: _updateUserRole,
-                  onEditUser: _openEditUserSheet,
-                  onDeleteUser: _confirmDeleteUser,
-                  onRefresh: _loadUsers,
-                ),
-                AdminStationsTab(
-                  stations: _stations,
-                  stationsLoadError: _stationsLoadError,
-                  selectedStationPoint: _selectedStationPoint,
-                  isSavingStation: _isSavingStation,
-                  mapController: _stationMapController,
-                  onRefresh: _loadStations,
-                  onAddStation: () => _openAddStationSheet(
-                    initialPoint: _selectedStationPoint,
-                  ),
-                  onEditStation: (station) {
-                    final point = _stationPointFromMap(station);
-                    _openAddStationSheet(
-                      initialPoint: point ?? _selectedStationPoint,
-                      editingStation: station,
-                    );
-                  },
-                  onDeleteStation: _confirmDeleteStation,
-                  onToggleStationOpen: _toggleStationOpen,
-                  onSelectStationPoint: (point) {
-                    setState(() => _selectedStationPoint = point);
-                  },
-                  onPickStation: (station) {
-                    _showSnack(
-                      'Selected: ${station['name'] ?? 'Station'}',
-                      isError: false,
-                    );
-                  },
-                  stationPointFromMap: _stationPointFromMap,
-                ),
-                AdminRecordsTab(
-                  records: _filteredRecords,
-                  totalRecords: _records.length,
-                  searchQuery: _recordSearchQuery,
-                  isSavingRecord: _isSavingRecord,
-                  onSearchChanged: (value) {
-                    setState(() => _recordSearchQuery = value);
-                  },
-                  onRefresh: _loadRecords,
-                  onEditRecord: _openEditRecordSheet,
-                  onDeleteRecord: _confirmDeleteRecord,
-                ),
-                AdminRewardsTab(
-                  rewards: _rewards,
-                  totalRedemptions: _totalRedemptions,
-                  rewardsLoadError: _rewardsLoadError,
-                  isSavingReward: _isSavingReward,
-                  onRefresh: _loadRewards,
-                  onAddReward: () => _openRewardSheet(),
-                  onEditReward: (reward) =>
-                      _openRewardSheet(editingReward: reward),
-                  onDeleteReward: _confirmDeleteReward,
-                  onToggleReward: _toggleRewardStatus,
-                ),
-              ],
+        controller: _tabController,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          AdminDashboardTab(
+            users: _users,
+            records: _records,
+            pendingRecords: _pendingRecords,
+            stations: _stations,
+            onRefresh: _loadAllData,
+            onModerateRecord: _moderatePendingRecord,
+          ),
+          AdminUsersTab(
+            users: _filteredUsers,
+            totalUsers: _users.length,
+            totalAdmins: _users.where((user) {
+              final role = (user['role'] ?? '').toString().toLowerCase();
+              return role == 'admin' || user['is_admin'] == true;
+            }).length,
+            searchQuery: _userSearchQuery,
+            roleFilter: _userRoleFilter,
+            onSearchChanged: (value) {
+              setState(() => _userSearchQuery = value);
+            },
+            onRoleFilterChanged: (value) {
+              setState(() => _userRoleFilter = value);
+            },
+            isUpdatingUser: _isUpdatingUser,
+            onToggleAdmin: _updateUserRole,
+            onEditUser: _openEditUserSheet,
+            onDeleteUser: _confirmDeleteUser,
+            onRefresh: _loadUsers,
+          ),
+          AdminStationsTab(
+            stations: _stations,
+            stationsLoadError: _stationsLoadError,
+            selectedStationPoint: _selectedStationPoint,
+            isSavingStation: _isSavingStation,
+            mapController: _stationMapController,
+            onRefresh: _loadStations,
+            onAddStation: () => _openAddStationSheet(
+              initialPoint: _selectedStationPoint,
             ),
+            onEditStation: (station) {
+              final point = _stationPointFromMap(station);
+              _openAddStationSheet(
+                initialPoint: point ?? _selectedStationPoint,
+                editingStation: station,
+              );
+            },
+            onDeleteStation: _confirmDeleteStation,
+            onToggleStationOpen: _toggleStationOpen,
+            onSelectStationPoint: (point) {
+              setState(() => _selectedStationPoint = point);
+            },
+            onPickStation: (station) {
+              _showSnack(
+                'Selected: ${station['name'] ?? 'Station'}',
+                isError: false,
+              );
+            },
+            stationPointFromMap: _stationPointFromMap,
+          ),
+          AdminRecordsTab(
+            records: _filteredRecords,
+            totalRecords: _records.length,
+            searchQuery: _recordSearchQuery,
+            dateFilter: _recordDateFilter,
+            statusFilter: _recordStatusFilter,
+            typeFilter: _recordTypeFilter,
+            stationFilter: _recordStationFilter,
+            typeFilterOptions: _recordTypeFilterOptions,
+            stationFilterOptions: _recordStationFilterOptions,
+            isSavingRecord: _isSavingRecord,
+            onSearchChanged: (value) {
+              setState(() => _recordSearchQuery = value);
+            },
+            onDateFilterChanged: (value) {
+              setState(() => _recordDateFilter = value);
+            },
+            onStatusFilterChanged: (value) {
+              setState(() => _recordStatusFilter = value);
+            },
+            onTypeFilterChanged: (value) {
+              setState(() => _recordTypeFilter = value);
+            },
+            onStationFilterChanged: (value) {
+              setState(() => _recordStationFilter = value);
+            },
+            onRefresh: _loadRecords,
+            onEditRecord: _openEditRecordSheet,
+            onDeleteRecord: _confirmDeleteRecord,
+          ),
+          AdminRewardsTab(
+            rewards: _rewards,
+            totalRedemptions: _totalRedemptions,
+            rewardsLoadError: _rewardsLoadError,
+            isSavingReward: _isSavingReward,
+            onRefresh: _loadRewards,
+            onAddReward: () => _openRewardSheet(),
+            onEditReward: (reward) =>
+                _openRewardSheet(editingReward: reward),
+            onDeleteReward: _confirmDeleteReward,
+            onToggleReward: _toggleRewardStatus,
+          ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         backgroundColor: _primary,
         indicatorColor: const Color(0xFF7EEDB0),
@@ -1875,31 +2080,31 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
           NavigationDestination(
             icon: Icon(Icons.dashboard_rounded, color: Colors.white70),
             selectedIcon:
-                Icon(Icons.dashboard_rounded, color: Color(0xFF1A4731)),
+            Icon(Icons.dashboard_rounded, color: Color(0xFF1A4731)),
             label: 'Dashboard',
           ),
           NavigationDestination(
             icon: Icon(Icons.people_alt_rounded, color: Colors.white70),
             selectedIcon:
-                Icon(Icons.people_alt_rounded, color: Color(0xFF1A4731)),
+            Icon(Icons.people_alt_rounded, color: Color(0xFF1A4731)),
             label: 'Users',
           ),
           NavigationDestination(
             icon: Icon(Icons.location_on_rounded, color: Colors.white70),
             selectedIcon:
-                Icon(Icons.location_on_rounded, color: Color(0xFF1A4731)),
+            Icon(Icons.location_on_rounded, color: Color(0xFF1A4731)),
             label: 'Stations',
           ),
           NavigationDestination(
             icon: Icon(Icons.receipt_long_rounded, color: Colors.white70),
             selectedIcon:
-                Icon(Icons.receipt_long_rounded, color: Color(0xFF1A4731)),
+            Icon(Icons.receipt_long_rounded, color: Color(0xFF1A4731)),
             label: 'Records',
           ),
           NavigationDestination(
             icon: Icon(Icons.card_giftcard_rounded, color: Colors.white70),
             selectedIcon:
-                Icon(Icons.card_giftcard_rounded, color: Color(0xFF1A4731)),
+            Icon(Icons.card_giftcard_rounded, color: Color(0xFF1A4731)),
             label: 'Rewards',
           ),
         ],
