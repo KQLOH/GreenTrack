@@ -1,4 +1,4 @@
-name: test2
+name: greentrack
 description: A Flutter login app with Supabase authentication.
 publish_to: 'none'
 version: 1.0.0+1
