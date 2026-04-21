@@ -941,32 +941,11 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       return;
     }
 
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(
-          'Delete Record',
-          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          'Delete this recycle record? This cannot be undone.',
-          style: GoogleFonts.dmSans(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE05454),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final result = await showDeleteConfirmDialog(
+      context,
+      title: 'Delete Record',
+      message: 'Delete this recycle record? This action cannot be undone.',
+      confirmText: 'Delete',
     );
 
     if (result != true) return;
@@ -1252,32 +1231,11 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       return;
     }
     final rewardName = (reward['name'] ?? 'this reward').toString();
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(
-          'Delete Reward',
-          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          'Delete $rewardName? This cannot be undone.',
-          style: GoogleFonts.dmSans(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE05454),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final result = await showDeleteConfirmDialog(
+      context,
+      title: 'Delete Reward',
+      message: 'Delete $rewardName? This action cannot be undone.',
+      confirmText: 'Delete',
     );
 
     if (result != true) return;
@@ -1291,6 +1249,25 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       if (!mounted) return;
       setState(() {});
       _showSnack('Reward deleted.', isError: false);
+    } on PostgrestException catch (error) {
+      final detail =
+          '${error.message} ${error.details ?? ''} ${error.hint ?? ''}'
+              .toLowerCase();
+      final isReferencedByRedemptions =
+          error.code == '23503' ||
+              detail.contains('foreign key') ||
+              detail.contains('reward_redemptions') ||
+              detail.contains('reward_id');
+
+      if (isReferencedByRedemptions) {
+        _showSnack(
+          'This reward has redemption history and cannot be deleted.',
+          isError: true,
+        );
+      } else {
+        _showSnack('Failed to delete reward. ${error.message}', isError: true);
+      }
+      debugPrint('Reward delete error: $error');
     } catch (error) {
       _showSnack('Failed to delete reward.', isError: true);
       debugPrint('Reward delete error: $error');
@@ -1532,32 +1509,11 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
 
   Future<void> _confirmDeleteStation(Map<String, dynamic> station) async {
     final name = (station['name'] ?? 'this station').toString();
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(
-          'Delete Station',
-          style: GoogleFonts.dmSans(fontWeight: FontWeight.w700),
-        ),
-        content: Text(
-          'Delete $name? This cannot be undone.',
-          style: GoogleFonts.dmSans(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE05454),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final result = await showDeleteConfirmDialog(
+      context,
+      title: 'Delete Station',
+      message: 'Delete $name? This action cannot be undone.',
+      confirmText: 'Delete',
     );
 
     if (result != true) return;
