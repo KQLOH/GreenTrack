@@ -52,7 +52,6 @@ class _RedemptionHistoryScreenState extends State<RedemptionHistoryScreen> with 
     return List.generate(8, (index) => chars[Random().nextInt(chars.length)]).join();
   }
 
-  // 3. 顯示核銷對話框
   void _showUseNowDialog(Map<String, dynamic> item) {
     final String tempCode = _generateRandomCode();
 
@@ -104,7 +103,6 @@ class _RedemptionHistoryScreenState extends State<RedemptionHistoryScreen> with 
     );
   }
 
-  // 4. 更新狀態為 completed
   Future<void> _completeRedemption(dynamic id, String finalCode) async {
     setState(() => _isLoading = true);
     try {
@@ -246,7 +244,6 @@ class _RedemptionHistoryScreenState extends State<RedemptionHistoryScreen> with 
             children: [
               Row(
                 children: [
-                  // 🟢 已統一：所有獎勵均顯示禮物圖標
                   _buildProviderIcon(),
                   const SizedBox(width: 12),
                   Expanded(
@@ -311,7 +308,6 @@ class _RedemptionHistoryScreenState extends State<RedemptionHistoryScreen> with 
     return Text(displayStatus, style: TextStyle(color: textColor, fontSize: 10, fontWeight: FontWeight.bold));
   }
 
-  // 🟢 已簡化：移除所有 provider 判斷，固定顯示禮物
   Widget _buildProviderIcon() {
     return Container(
         padding: const EdgeInsets.all(10),

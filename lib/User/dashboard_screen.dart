@@ -19,17 +19,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _isLoading = true;
   String _username = '';
 
-  // Computed stats
   double _weeklyWeight = 0;
   double _monthlyWeight = 0;
   double _co2Saved = 0;
-  double _monthlyGoal = 25.0; // kg target
+  double _monthlyGoal = 25.0;
    int _totalPoints = 0;
   List<double> _weeklyBarData = List.filled(7, 0);
   Map<String, double> _categoryBreakdown = {};
   List<Map<String, dynamic>> _recentActivity = [];
 
-  // Nearby stations loaded from Supabase `recycling_stations`.
   List<Map<String, dynamic>> _stations = [];
 
   late AnimationController _fadeController;
@@ -65,7 +63,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         orElse: () => <String, dynamic>{},
       );
 
-      // Load all records
       final allRecords = await supabase
           .from('recycle_records')
           .select()
@@ -110,7 +107,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         }
       }
 
-      // CO2 saved: ~2.5 kg CO2 per kg recycled (average)
       final co2 = monthlyWeight * 2.5;
 
       try {
@@ -133,7 +129,6 @@ class _DashboardScreenState extends State<DashboardScreen>
           });
         }
       } catch (_) {
-        // Keep station list empty if table/columns are unavailable.
       }
 
       final recent = (records as List).take(5).toList();
@@ -254,9 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
 
                       GestureDetector(
-                        // 1. 這裡必須加上 async
                         onTap: () async {
-                          // 2. 這裡加上 await，並用 updatedPoints 接收傳回值
                           final updatedPoints = await Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -264,7 +257,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                             ),
                           );
 
-                          // 3. 判斷是否有回傳值，有的話才更新 UI
                           if (updatedPoints != null && mounted) {
                             setState(() {
                               _totalPoints = updatedPoints;
@@ -279,7 +271,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                           ),
                           child: Row(
-                            mainAxisSize: MainAxisSize.min, // 建議加上這個，防止 Container 撐太開
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.star_rounded, color: Color(0xFFFFD700), size: 16),
                               const SizedBox(width: 5),
@@ -296,7 +288,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ),
                       ),
                       const SizedBox(width: 10),
-                      // Avatar
                       Container(
                         width: 42,
                         height: 42,
@@ -328,7 +319,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // â”€â”€ Overview Grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildOverviewGrid() {
     return Column(
@@ -441,7 +431,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // â”€â”€ Analytics (Weekly Bar Chart) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildAnalyticsSection() {
     final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -565,7 +554,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     );
   }
-  // â”€â”€ Monthly Goal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildMonthlyGoal() {
     final safeGoal = _monthlyGoal <= 0 ? 25.0 : _monthlyGoal;

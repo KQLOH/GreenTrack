@@ -7,10 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/supabase_client.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// No API key needed – uses OpenStreetMap (completely free).
-// ─────────────────────────────────────────────────────────────────────────────
-
 const _recycleTypes = [
   _RecycleType('Plastic', Icons.water_drop_outlined, Color(0xFF3DAB6A),
       Color(0xFFE8F5EE)),
@@ -34,7 +30,6 @@ class _RecycleType {
   const _RecycleType(this.label, this.icon, this.color, this.bg);
 }
 
-// ─── Data Model ───────────────────────────────────────────────────────────────
 
 class RecyclingCenter {
   final String id;
@@ -64,7 +59,6 @@ class RecyclingCenter {
   });
 }
 
-// ─── Map Screen ───────────────────────────────────────────────────────────────
 
 class RecycleMapScreen extends StatefulWidget {
   const RecycleMapScreen({super.key, this.initialStationId});
@@ -86,7 +80,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
   bool _isLoading = true;
   int _radiusKm = 5;
 
-  // favourite station IDs – loaded from Supabase favorite_stations table
   Set<String> _favoriteIds = {};
   bool _favLoading = false;
 
@@ -113,7 +106,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     super.dispose();
   }
 
-  // ── Favourites via Supabase ───────────────────────────────────────────────
 
   Future<void> _loadFavoriteIds() async {
     try {
@@ -126,7 +118,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
       final ids = (rows as List).map((r) => r['station_id'].toString()).toSet();
       if (mounted) setState(() => _favoriteIds = ids);
     } catch (_) {
-      // silently ignore – table may not exist yet
     }
   }
 
@@ -137,7 +128,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     setState(() => _favLoading = true);
     final wasFav = _favoriteIds.contains(stationId);
 
-    // Optimistic UI update
     setState(() {
       if (wasFav) {
         _favoriteIds.remove(stationId);
@@ -160,7 +150,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
         });
       }
     } catch (_) {
-      // Revert on failure
       if (mounted) {
         setState(() {
           if (wasFav) {
@@ -184,17 +173,13 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     }
   }
 
-  // ── Location ──────────────────────────────────────────────────────────────
 
-// 1. 修改初始化位置的方法
   Future<void> _initLocation() async {
     setState(() => _isLoading = true);
     try {
-      // 請求權限
       final hasPermission = await _requestPermission();
 
       if (!hasPermission) {
-        // 如果權限被拒絕，使用預設地點（馬六甲）
         setState(() {
           _currentPosition = _melakaCenter;
           _isLoading = false;
@@ -203,7 +188,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
         return;
       }
 
-      // 權限通過，獲取位置
       final pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high);
 
@@ -226,7 +210,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
   }
 
   Future<bool> _requestPermission() async {
-    // 檢查 GPS 服務是否開啟
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -267,7 +250,7 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
           ),
           TextButton(
             onPressed: () {
-              Geolocator.openAppSettings(); // 開啟系統設定頁面
+              Geolocator.openAppSettings();
               Navigator.pop(context);
             },
             child: const Text('Settings'),
@@ -277,7 +260,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     );
   }
 
-  // ── Load Centers ──────────────────────────────────────────────────────────
 
   double? _toDouble(dynamic v) {
     if (v is num) return v.toDouble();
@@ -374,7 +356,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     });
   }
 
-  // ── Navigation ────────────────────────────────────────────────────────────
 
   void _showNavOptions(RecyclingCenter c) {
     showModalBottomSheet(
@@ -491,7 +472,7 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     );
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+
 
   @override
   Widget build(BuildContext context) {
@@ -876,7 +857,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
         ),
       );
 
-  // ── Detail Sheet ──────────────────────────────────────────────────────────
 
   Widget _buildDetailSheet() {
     final c = _selectedCenter!;
@@ -899,7 +879,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
             ],
           ),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            // Handle + ⭐ + close
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               child: Row(children: [
@@ -913,7 +892,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
                             borderRadius: BorderRadius.circular(2))),
                   ),
                 ),
-                // ⭐ Favourite button
                 GestureDetector(
                   onTap: _favLoading ? null : () => _toggleFavorite(c.id),
                   child: AnimatedContainer(
@@ -962,7 +940,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
               ),
             ),
 
-            // Navigate button
             Padding(
               padding: EdgeInsets.fromLTRB(
                   20, 12, 20, MediaQuery.of(context).padding.bottom + 16),
@@ -1050,7 +1027,6 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
             child: _chip(Icons.phone_outlined, c.phoneNumber!,
                 const Color(0xFF9B6FD4), const Color(0xFFF0EBF9)),
           ),
-        // ⭐ Save chip
         GestureDetector(
           onTap: _favLoading ? null : () => _toggleFavorite(c.id),
           child: AnimatedContainer(

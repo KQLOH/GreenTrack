@@ -20,7 +20,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   int _step = 1;
   bool _isLoading = false;
 
-  // Resend OTP 相關
   int _resendCountdown = 0;
   Timer? _timer;
 
@@ -45,7 +44,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  // 1. 發送 OTP
   Future<void> _sendOTP({bool isResend = false}) async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -64,7 +62,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
   }
 
-  // 2. 驗證 OTP
   Future<void> _verifyOTP() async {
     if (_otpController.text.length < 8) {
       _showError('Please enter the full 8-digit code');
@@ -85,28 +82,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
   }
 
-// 3. 更新密碼
   Future<void> _resetPassword() async {
-    // 觸發輸入框樓下的 Validation
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
     try {
-      // 1. 調用 Supabase 更新密碼
       await Supabase.instance.client.auth.updateUser(
         UserAttributes(password: _newPasswordController.text.trim()),
       );
 
-      // 2. 顯示成功提示（白色字體）
       _showSuccess('Password reset successful! Please login with your new password.');
 
-      // 3. 強制登出（確保當前 Session 清除，讓用戶必須重新手動登錄）
       await Supabase.instance.client.auth.signOut();
 
-      // 4. 延遲 2 秒讓用戶看清提示，然後退回到 Login Page
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) {
-          // 返回上一頁 (也就是 Login 頁面)
           Navigator.pop(context);
         }
       });
@@ -152,7 +142,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 28),
             child: Form(
-              key: _formKey, // 加入 Form Key 用於驗證
+              key: _formKey,
               child: Column(
                 children: [
                   const SizedBox(height: 20),
@@ -288,7 +278,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             validator: (val) {
               if (val == null || val.isEmpty) return 'Please enter a password';
               if (val.length < 6) return 'At least 6 characters';
-              // 密碼規則：字母、數字、符號
               if (!RegExp(r'^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]').hasMatch(val)) {
                 return 'Must include letters, numbers & symbols';
               }
@@ -325,7 +314,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           padding: const EdgeInsets.only(left: 4, bottom: 8),
           child: Text(label, style: GoogleFonts.dmSans(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
         ),
-        TextFormField( // 改為 TextFormField 支援樓下顯示錯誤
+        TextFormField(
           controller: ctrl,
           obscureText: isPsw,
           validator: validator,
@@ -334,7 +323,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             prefixIcon: Icon(icon, color: Colors.white60, size: 20),
             filled: true,
             fillColor: Colors.white.withOpacity(0.08),
-            errorStyle: const TextStyle(color: Color(0xFFFF6B6B), fontSize: 12), // 錯誤提示顏色
+            errorStyle: const TextStyle(color: Color(0xFFFF6B6B), fontSize: 12),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF4CD787))),

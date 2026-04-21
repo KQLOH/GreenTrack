@@ -213,10 +213,8 @@ class _RecycleScreenState extends State<RecycleScreen>
       final coords = <String, Map<String, double>>{};
 
       for (final row in rows) {
-        // Admin toggles station availability via is_open.
         if (row['is_open'] == false) continue;
 
-        // Treat missing is_active as active for backward compatibility.
         if (row['is_active'] == false) continue;
 
         final name = (row['name'] ?? '').toString().trim();
@@ -780,7 +778,6 @@ class _InlineAddFormState extends State<_InlineAddForm> {
       _currentLat = position.latitude;
       _currentLng = position.longitude;
 
-      // 自动选最近的 station
       final sorted = _stationsSortedByDistance;
       if (sorted.isNotEmpty && widget.stations.contains(sorted.first)) {
         _selectedStation = sorted.first;

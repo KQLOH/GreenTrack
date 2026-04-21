@@ -7,7 +7,6 @@ import 'dart:convert';
 class AuthService {
   final SupabaseClient _supabase = supabaseClient;
 
-  /// Sign in with email and password
   Future<AuthResponse> signIn({
     required String email,
     required String password,
@@ -18,7 +17,6 @@ class AuthService {
     );
   }
 
-  /// Sign up with email, password and username
   Future<AuthResponse> signUp({
     required String email,
     required String password,
@@ -40,7 +38,6 @@ class AuthService {
     return response;
   }
 
-  /// Get current user profile from profiles table
   Future<Map<String, dynamic>?> getProfile() async {
     final user = _supabase.auth.currentUser;
     if (user == null) return null;
@@ -54,7 +51,6 @@ class AuthService {
     return response;
   }
 
-  /// Update username in profiles table
   Future<void> updateUsername(String username) async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
@@ -64,21 +60,18 @@ class AuthService {
     }).eq('id', user.id);
   }
 
-  /// Update email using the standard confirmation link flow
   Future<UserResponse> updateEmail(String newEmail) async {
     return await _supabase.auth.updateUser(
       UserAttributes(email: newEmail),
     );
   }
 
-  /// Update password (this will work if user is signed in)
   Future<UserResponse> updatePassword(String newPassword) async {
     return await _supabase.auth.updateUser(
       UserAttributes(password: newPassword),
     );
   }
 
-  /// Send password reset OTP to current email
   Future<void> sendPasswordResetOTP() async {
     final user = _supabase.auth.currentUser;
     if (user == null || user.email == null) return;
@@ -90,16 +83,13 @@ class AuthService {
       final user = _supabase.auth.currentUser;
       if (user == null) return null;
 
-      // 1. 讀取圖片並轉成 Base64 字串
       final bytes = await imageFile.readAsBytes();
       final String base64String = base64Encode(bytes);
 
-      // 2. 加上 Data URL 前綴，讓 App 知道這是一張圖片文字
       final String dataUrl = 'data:image/jpeg;base64,$base64String';
 
-      // 3. 直接更新 Profiles Table，不再去碰 Storage
       await _supabase.from('profiles').update({
-        'avatar_url': dataUrl, // 直接把這串超長文字存進去
+        'avatar_url': dataUrl,
       }).eq('id', user.id);
 
       return dataUrl;
@@ -108,11 +98,9 @@ class AuthService {
     }
   }
 
-  /// Sign out
   Future<void> signOut() async {
     await _supabase.auth.signOut();
   }
 
-  /// Get current user
   User? get currentUser => _supabase.auth.currentUser;
 }

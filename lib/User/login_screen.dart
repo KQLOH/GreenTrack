@@ -111,7 +111,6 @@ class _LoginScreenState extends State<LoginScreen>
                     children: [
                       const SizedBox(height: 50),
 
-                      // App Icon
                       Container(
                         width: 76,
                         height: 76,
@@ -142,7 +141,6 @@ class _LoginScreenState extends State<LoginScreen>
 
                       const SizedBox(height: 20),
 
-                      // App name
                       Text(
                         'GreenTrack',
                         style: GoogleFonts.dmSerifDisplay(
@@ -162,7 +160,6 @@ class _LoginScreenState extends State<LoginScreen>
 
                       const SizedBox(height: 40),
 
-                      // Card container
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
@@ -219,7 +216,6 @@ class _LoginScreenState extends State<LoginScreen>
 
                             const SizedBox(height: 18),
 
-                            // Password field
                             _GreenTextField(
                               label: 'PASSWORD',
                               hint: 'Enter your password',
@@ -238,7 +234,6 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
 
                             const SizedBox(height: 2),
-                            //f0rgot pwrd
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton(
@@ -262,7 +257,6 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                             const SizedBox(height: 1),
 
-                            // Login button
                             SizedBox(
                               width: double.infinity,
                               height: 54,
@@ -306,7 +300,6 @@ class _LoginScreenState extends State<LoginScreen>
 
                       const SizedBox(height: 28),
 
-                      // Register link
                       GestureDetector(
                         onTap: () {
                           Navigator.push(

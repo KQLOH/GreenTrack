@@ -57,7 +57,6 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    // Listen to auth state changes
     supabaseClient.auth.onAuthStateChange.listen((data) {
       if (mounted) {
         setState(() {});

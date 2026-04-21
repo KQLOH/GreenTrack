@@ -466,7 +466,6 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
     }
 
     try {
-      // 1. 更新 record 状态（approve 同时给积分）
       final updateData = approved
           ? {
         'status': 'approved',
@@ -488,13 +487,12 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       final updatedRows = List<Map<String, dynamic>>.from(updated as List);
       if (updatedRows.isEmpty) {
         _showSnack(
-          'No record updated. Check RLS/update permissions for recycle_records.',
+          'No record updated. ',
           isError: true,
         );
         return;
       }
 
-      // 2. 插入 notification 给该 user
       final userId = record['user_id']?.toString();
       final category = record['category']?.toString() ?? 'item';
       final weight = (record['weight_kg'] as num?)?.toStringAsFixed(1) ?? '?';
@@ -538,10 +536,10 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       _showSnack(
         approved
             ? (notificationFailed
-            ? 'Record approved. Notification not sent (RLS policy).'
+            ? 'Record approved. ).'
             : 'Record approved.')
             : (notificationFailed
-            ? 'Record rejected. Notification not sent (RLS policy).'
+            ? 'Record rejected. ).'
             : 'Record rejected.'),
         isError: false,
       );
