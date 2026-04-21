@@ -63,7 +63,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final profile =
       await _supabase.from('profiles').select().eq('id', user.id).single();
 
-      // 3. AUTO-SYNC: If Auth email (verified link) is different from Table, update table
       if (user.email != null && profile['email'] != user.email) {
         await _supabase
             .from('profiles')
@@ -343,7 +342,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? DateTime.parse(joinedRaw).toLocal().toString().substring(0, 10)
         : '-';
 
-    // ── Read current goal for display ────────────────────────────────────
     final monthlyGoal =
         ((_profile?['monthly_goal_kg'] as num?)?.toDouble()) ?? 25.0;
 
@@ -546,7 +544,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               sliver: SliverList(
 delegate: SliverChildListDelegate(
   [
-    // Stats row
     Container(
       padding: const EdgeInsets.symmetric(
         horizontal: 24,
@@ -584,7 +581,6 @@ delegate: SliverChildListDelegate(
     ),
     const SizedBox(height: 28),
 
-    // Monthly Goal
     _sectionLabel('Monthly Goal'),
     const SizedBox(height: 10),
     GestureDetector(
@@ -693,14 +689,7 @@ delegate: SliverChildListDelegate(
           title: 'Change Password',
           onTap: _showChangePasswordSheet,
         ),
-        _MenuItem(
-          icon: Icons.notifications_none_rounded,
-          iconColor: const Color(0xFF4A90D9),
-          emojiColor: const Color(0xFFE8F0FA),
-          title: 'Notifications',
-          badge: _unreadCount > 0 ? _unreadCount : null,
-          onTap: _openNotifications,
-        ),
+
       ],
     ),
 
@@ -915,9 +904,6 @@ delegate: SliverChildListDelegate(
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Monthly Goal Bottom Sheet
-// ─────────────────────────────────────────────────────────────────────────────
 
 class MonthlyGoalSheet extends StatefulWidget {
   final double currentGoal;
@@ -934,7 +920,6 @@ class _MonthlyGoalSheetState extends State<MonthlyGoalSheet> {
   bool _isSaving = false;
   String? _errorText;
 
-  // Quick preset options
   final List<double> _presets = [5, 10, 15, 20, 25, 30, 50, 100];
 
   @override
@@ -995,7 +980,6 @@ class _MonthlyGoalSheetState extends State<MonthlyGoalSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle bar
             Center(
               child: Container(
                 width: 36,
@@ -1008,7 +992,6 @@ class _MonthlyGoalSheetState extends State<MonthlyGoalSheet> {
             ),
             const SizedBox(height: 20),
 
-            // Header
             Row(
               children: [
                 Container(
@@ -1049,7 +1032,6 @@ class _MonthlyGoalSheetState extends State<MonthlyGoalSheet> {
             ),
             const SizedBox(height: 24),
 
-            // Quick presets
             Text(
               'QUICK SELECT',
               style: GoogleFonts.dmSans(
@@ -1101,7 +1083,6 @@ class _MonthlyGoalSheetState extends State<MonthlyGoalSheet> {
             ),
             const SizedBox(height: 22),
 
-            // Custom input
             Text(
               'OR ENTER CUSTOM (KG)',
               style: GoogleFonts.dmSans(
@@ -1165,7 +1146,6 @@ class _MonthlyGoalSheetState extends State<MonthlyGoalSheet> {
             ),
             const SizedBox(height: 24),
 
-            // Save button
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -1202,24 +1182,6 @@ class _MonthlyGoalSheetState extends State<MonthlyGoalSheet> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// dashboard_screen.dart helper — call this to get the goal
-// Add this static method or use it directly in DashboardScreen._loadData()
-// ─────────────────────────────────────────────────────────────────────────────
-//
-// In dashboard_screen.dart, replace:
-//   final double _monthlyGoal = 25.0;
-//
-// With:
-//   double _monthlyGoal = 25.0;
-//
-// And inside _loadData(), after loading the profile, add:
-//   _monthlyGoal = ((profile['monthly_goal_kg'] as num?)?.toDouble()) ?? 25.0;
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// The rest of the file below is unchanged from your original
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _MenuItem extends StatelessWidget {
   final IconData icon;

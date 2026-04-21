@@ -129,7 +129,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     const SizedBox(height: 20),
 
-                    // Avatar + greeting
                     Row(
                       children: [
                         Container(
@@ -179,7 +178,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 32),
 
-                    // Email card
                     _infoCard(
                       icon: Icons.mail_outline_rounded,
                       label: 'EMAIL',
@@ -188,7 +186,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Username card
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -298,7 +295,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Joined date card
                     _infoCard(
                       icon: Icons.calendar_today_outlined,
                       label: 'JOINED',
@@ -414,7 +410,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(
-                              0xFF00A8E8), // Blue color for map feature distinction
+                              0xFF00A8E8),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -422,7 +418,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
 
-                    // Sign out
                     SizedBox(
                       width: double.infinity,
                       height: 56,

@@ -54,24 +54,21 @@ class _RegisterScreenState extends State<RegisterScreen>
     setState(() => _isLoading = true);
 
     try {
-      // 1. 執行註冊 (只會在 Supabase Auth 建立帳號)
       final response = await _authService.signUp(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
         username: _usernameController.text.trim(),
       );
 
-      // 2. 只有註冊成功，手動將資料插入你的 user table
-      // 注意：這裡不傳 id，讓資料庫的 int8 自動遞增 (生成 10, 11, 12...)
+
       if (response.user != null) {
         await Supabase.instance.client.from('user').insert({
           'name': _usernameController.text.trim(),
           'email': _emailController.text.trim(),
-          'created_at': DateTime.now().toIso8601String(), // 建議加上時間戳
+          'created_at': DateTime.now().toIso8601String(),
         });
       }
 
-      // 3. 註冊後立即登出 (確保用戶必須重新在 Login 頁輸入)
       await Supabase.instance.client.auth.signOut();
 
       if (mounted) {
@@ -80,14 +77,13 @@ class _RegisterScreenState extends State<RegisterScreen>
 
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
-            Navigator.pop(context); // 回到之前的 LoginScreen
+            Navigator.pop(context);
           }
         });
       }
     } on AuthException catch (e) {
       if (mounted) _showError(e.message);
     } catch (e) {
-      // 捕獲插入 Table 可能產生的錯誤
       if (mounted)
         _showError(
             'Account created but failed to save profile: ${e.toString()}');
@@ -123,9 +119,9 @@ class _RegisterScreenState extends State<RegisterScreen>
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFF1A4731), // 深綠
-              Color(0xFF2D7A4F), // 中綠
-              Color(0xFF3DAB6A), // 亮綠
+              Color(0xFF1A4731),
+              Color(0xFF2D7A4F),
+              Color(0xFF3DAB6A),
             ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -144,7 +140,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                     children: [
                       const SizedBox(height: 30),
 
-                      // 返回按鈕
                       Align(
                         alignment: Alignment.centerLeft,
                         child: IconButton(
@@ -154,7 +149,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                         ),
                       ),
 
-                      // 圖標
                       Container(
                         width: 76,
                         height: 76,
@@ -186,7 +180,6 @@ class _RegisterScreenState extends State<RegisterScreen>
 
                       const SizedBox(height: 32),
 
-                      // 卡片容器
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
@@ -209,7 +202,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 if (val.length < 6)
                                   return 'Username must be at least 6 characters';
 
-                                // 正则表达式：必须同时包含字母 [a-zA-Z] 和数字 [0-9]
                                 final hasLetter =
                                     RegExp(r'[a-zA-Z]').hasMatch(val);
                                 final hasDigit = RegExp(r'[0-9]').hasMatch(val);
@@ -245,7 +237,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                                 if (val.length < 6)
                                   return 'Password must be at least 6 characters';
 
-                                // 检查字母、数字、特殊符号
                                 final hasLetter =
                                     RegExp(r'[a-zA-Z]').hasMatch(val);
                                 final hasDigit = RegExp(r'[0-9]').hasMatch(val);
@@ -273,7 +264,6 @@ class _RegisterScreenState extends State<RegisterScreen>
                             ),
                             const SizedBox(height: 28),
 
-                            // 註冊按鈕
                             SizedBox(
                               width: double.infinity,
                               height: 54,
@@ -337,7 +327,6 @@ class _RegisterScreenState extends State<RegisterScreen>
   }
 }
 
-// 複用 Login 頁面的文本框樣式
 class _GreenTextField extends StatefulWidget {
   final String label;
   final String hint;

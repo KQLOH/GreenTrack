@@ -24,7 +24,6 @@ class _RewardsScreenState extends State<RewardsScreen> {
     _initData();
   }
 
-  // 同時抓取獎勵列表和用戶兌換紀錄
   Future<void> _initData() async {
     await _fetchAdminRewards();
     await _fetchUserRedemptionCounts();
@@ -84,7 +83,6 @@ class _RewardsScreenState extends State<RewardsScreen> {
     final int maxPerUser = (reward['max_per_user'] as num?)?.toInt() ?? 0;
     final int currentUsed = _userRedemptionCounts[rewardId] ?? 0;
 
-    // 雙重檢查：是否超過個人限額
     if (maxPerUser > 0 && currentUsed >= maxPerUser) {
       _showErrorSnackBar("You've reached the maximum limit for this reward.");
       return;
@@ -106,7 +104,6 @@ class _RewardsScreenState extends State<RewardsScreen> {
         'redeemed_count': ((reward['redeemed_count'] as num?)?.toInt() ?? 0) + 1,
       }).eq('id', rewardId).select().single();
 
-      // 3. 寫入紀錄
       await _supabase.from('reward_redemptions').insert({
         'user_id': user.id,
         'reward_id': rewardId,

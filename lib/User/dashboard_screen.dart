@@ -19,17 +19,15 @@ class _DashboardScreenState extends State<DashboardScreen>
   bool _isLoading = true;
   String _username = '';
 
-  // Computed stats
   double _weeklyWeight = 0;
   double _monthlyWeight = 0;
   double _co2Saved = 0;
-  double _monthlyGoal = 25.0; // kg target
+  double _monthlyGoal = 25.0;
    int _totalPoints = 0;
   List<double> _weeklyBarData = List.filled(7, 0);
   Map<String, double> _categoryBreakdown = {};
   List<Map<String, dynamic>> _recentActivity = [];
 
-  // Nearby stations loaded from Supabase `recycling_stations`.
   List<Map<String, dynamic>> _stations = [];
 
   late AnimationController _fadeController;
@@ -65,7 +63,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         orElse: () => <String, dynamic>{},
       );
 
-      // Load all records
       final allRecords = await supabase
           .from('recycle_records')
           .select()
@@ -75,8 +72,9 @@ class _DashboardScreenState extends State<DashboardScreen>
           .toList();
 
       final now = DateTime.now();
-      final startOfWeek =
-      now.subtract(Duration(days: now.weekday - 1)); // Monday
+
+      final today = DateTime(now.year, now.month, now.day);
+      final startOfWeek = today.subtract(Duration(days: today.weekday - 1));
       final startOfMonth = DateTime(now.year, now.month, 1);
 
       double weeklyWeight = 0;
@@ -89,7 +87,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         final status = (r['status'] ?? '').toString().toLowerCase();
         if (status != 'approved') continue;
 
-        final date = DateTime.parse(r['date'].toString());
+        final rawDate = DateTime.parse(r['date'].toString());
+        final date = DateTime(rawDate.year, rawDate.month, rawDate.day);
         final weight = (r['weight_kg'] as num).toDouble();
         final category = (r['category'] ?? '').toString();
 
@@ -108,7 +107,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         }
       }
 
-      // CO2 saved: ~2.5 kg CO2 per kg recycled (average)
       final co2 = monthlyWeight * 2.5;
 
       try {
@@ -131,7 +129,6 @@ class _DashboardScreenState extends State<DashboardScreen>
           });
         }
       } catch (_) {
-        // Keep station list empty if table/columns are unavailable.
       }
 
       final recent = (records as List).take(5).toList();
@@ -252,9 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
 
                       GestureDetector(
-                        // 1. 這裡必須加上 async
                         onTap: () async {
-                          // 2. 這裡加上 await，並用 updatedPoints 接收傳回值
                           final updatedPoints = await Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -262,7 +257,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                             ),
                           );
 
-                          // 3. 判斷是否有回傳值，有的話才更新 UI
                           if (updatedPoints != null && mounted) {
                             setState(() {
                               _totalPoints = updatedPoints;
@@ -277,7 +271,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                             border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                           ),
                           child: Row(
-                            mainAxisSize: MainAxisSize.min, // 建議加上這個，防止 Container 撐太開
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.star_rounded, color: Color(0xFFFFD700), size: 16),
                               const SizedBox(width: 5),
@@ -294,7 +288,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ),
                       ),
                       const SizedBox(width: 10),
-                      // Avatar
                       Container(
                         width: 42,
                         height: 42,
@@ -326,7 +319,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // â”€â”€ Overview Grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildOverviewGrid() {
     return Column(
@@ -439,14 +431,12 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // â”€â”€ Analytics (Weekly Bar Chart) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildAnalyticsSection() {
     final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final maxVal = _weeklyBarData
         .reduce((a, b) => a > b ? a : b)
         .clamp(0.1, double.infinity);
-    final todayIndex = DateTime.now().weekday - 1;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -455,39 +445,54 @@ class _DashboardScreenState extends State<DashboardScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 4))
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          )
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            _sectionTitle('Analytics'),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: const Color(0xFFDFF5E9),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(children: [
-                const Icon(Icons.bar_chart_rounded,
-                    color: Color(0xFF3DAB6A), size: 14),
-                const SizedBox(width: 4),
-                Text('Weekly',
-                    style: GoogleFonts.dmSans(
+          Row(
+            children: [
+              _sectionTitle('Analytics'),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDFF5E9),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.bar_chart_rounded,
+                      color: Color(0xFF3DAB6A),
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Weekly',
+                      style: GoogleFonts.dmSans(
                         color: const Color(0xFF3DAB6A),
                         fontSize: 11,
-                        fontWeight: FontWeight.w600)),
-              ]),
-            ),
-          ]),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 4),
-          Text('Recycling (kg)',
-              style: GoogleFonts.dmSans(
-                  color: Colors.grey.shade400, fontSize: 12)),
+          Text(
+            'Recycling (kg)',
+            style: GoogleFonts.dmSans(
+              color: Colors.grey.shade400,
+              fontSize: 12,
+            ),
+          ),
           const SizedBox(height: 20),
           SizedBox(
             height: 200,
@@ -496,7 +501,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               children: List.generate(7, (i) {
                 final val = _weeklyBarData[i];
                 final heightFactor = (val / maxVal).clamp(0.05, 1.0);
-                final isToday = i == todayIndex;
+
                 return Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
@@ -507,36 +512,37 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Text(
                             val.toStringAsFixed(1),
                             style: GoogleFonts.dmSans(
-                                color: isToday
-                                    ? const Color(0xFF2D7A4F)
-                                    : Colors.grey.shade400,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600),
+                              color: const Color(0xFF2D7A4F),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         const SizedBox(height: 4),
                         AnimatedContainer(
                           duration: Duration(milliseconds: 400 + i * 80),
                           curve: Curves.easeOutCubic,
-                          height: val > 0 ? (20 + 60 * heightFactor) : 6,                          decoration: BoxDecoration(
-                            color: isToday
-                                ? const Color(0xFF2D7A4F)
-                                : val > 0
-                                ? const Color(0xFF7EEDB0)
+                          height: val > 0 ? (20 + 60 * heightFactor) : 6,
+                          decoration: BoxDecoration(
+                            color: val > 0
+                                ? const Color(0xFF3DAB6A)
                                 : Colors.grey.shade100,
                             borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(6)),
+                              top: Radius.circular(6),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Text(days[i],
-                            style: GoogleFonts.dmSans(
-                                color: isToday
-                                    ? const Color(0xFF2D7A4F)
-                                    : Colors.grey.shade400,
-                                fontSize: 10,
-                                fontWeight: isToday
-                                    ? FontWeight.w700
-                                    : FontWeight.w400)),
+                        Text(
+                          days[i],
+                          style: GoogleFonts.dmSans(
+                            color: val > 0
+                                ? const Color(0xFF2D7A4F)
+                                : Colors.grey.shade400,
+                            fontSize: 10,
+                            fontWeight:
+                            val > 0 ? FontWeight.w700 : FontWeight.w400,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -548,8 +554,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     );
   }
-
-  // â”€â”€ Monthly Goal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   Widget _buildMonthlyGoal() {
     final safeGoal = _monthlyGoal <= 0 ? 25.0 : _monthlyGoal;
