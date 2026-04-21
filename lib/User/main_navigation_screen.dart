@@ -38,6 +38,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       _currentIndex = 2;
       _pageRefreshTokens[2]++;
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_exploreInitialStationId == stationId) {
+        setState(() {
+          _exploreInitialStationId = null;
+        });
+      }
+    });
   }
 
   @override
@@ -65,9 +74,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         onDestinationSelected: (int index) {
           setState(() {
             if (_currentIndex == index) {
+              if (index == 2) {
+                _exploreInitialStationId = null;
+              }
               _pageRefreshTokens[index]++;
             } else {
               _currentIndex = index;
+              if (index == 2) {
+                _exploreInitialStationId = null;
+                _pageRefreshTokens[2]++;
+              }
             }
           });
         },

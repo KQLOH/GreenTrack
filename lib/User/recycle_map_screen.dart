@@ -76,6 +76,7 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
   List<RecyclingCenter> _centers = [];
   List<RecyclingCenter> _allCenters = [];
   RecyclingCenter? _selectedCenter;
+  String? _consumedInitialStationId;
 
   bool _isLoading = true;
   int _radiusKm = 5;
@@ -104,6 +105,19 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
   void dispose() {
     _sheetAnim.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant RecycleMapScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.initialStationId != oldWidget.initialStationId) {
+      if (widget.initialStationId == null) {
+        _consumedInitialStationId = null;
+      } else if (widget.initialStationId != _consumedInitialStationId) {
+        _consumedInitialStationId = null;
+      }
+    }
   }
 
 
@@ -316,6 +330,8 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
     final display = nearby.isEmpty ? withDistance.take(20).toList() : nearby;
     RecyclingCenter? targetCenter;
     final targetId = widget.initialStationId;
+    final shouldAutoOpen =
+        targetId != null && targetId.isNotEmpty && _consumedInitialStationId != targetId;
     if (targetId != null && targetId.isNotEmpty) {
       for (final center in withDistance) {
         if (center.id == targetId) {
@@ -323,17 +339,23 @@ class _RecycleMapScreenState extends State<RecycleMapScreen>
           break;
         }
       }
-      final matchedCenter = targetCenter;
-      if (matchedCenter != null &&
-          !display.any((center) => center.id == matchedCenter.id)) {
-        display.insert(0, matchedCenter);
+      if (targetCenter != null &&
+          !display.any((center) => center.id == targetCenter!.id)) {
+        display.insert(0, targetCenter);
       }
+    }
+    if (!shouldAutoOpen) {
+      targetCenter = null;
     }
     setState(() {
       _centers = display;
       _isLoading = false;
       _selectedCenter = targetCenter;
     });
+
+    if (shouldAutoOpen && targetCenter != null) {
+      _consumedInitialStationId = targetId;
+    }
 
     if (targetCenter != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

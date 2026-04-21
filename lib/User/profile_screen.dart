@@ -261,8 +261,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _pickAndUploadAvatar() async {
     final picker = ImagePicker();
+
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const Text(
+              'Update Profile Picture',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildOption(
+                  icon: Icons.photo_library_rounded,
+                  label: 'Gallery',
+                  onTap: () => Navigator.pop(context, ImageSource.gallery),
+                ),
+                _buildOption(
+                  icon: Icons.camera_enhance_rounded,
+                  label: 'Camera',
+                  onTap: () => Navigator.pop(context, ImageSource.camera),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
     final image = await picker.pickImage(
-      source: ImageSource.gallery,
+      source: source,
       imageQuality: 70,
       maxWidth: 512,
     );
@@ -276,25 +326,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _loadData();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Avatar updated successfully!'),
-            backgroundColor: Color(0xFF2D7A4F),
-          ),
+        _showCustomSnackBar(
+          context: context,
+          message: 'Avatar updated successfully!',
+          icon: Icons.check_circle_outline,
+          isError: false,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to upload avatar: $e'),
-            backgroundColor: const Color(0xFFE05454),
-          ),
+        _showCustomSnackBar(
+          context: context,
+          message: 'Failed to upload: ${e.toString().split(':').last}',
+          icon: Icons.error_outline,
+          isError: true,
         );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Widget _buildOption({required IconData icon, required String label, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(15),
+      child: Container(
+        width: 100,
+        padding: const EdgeInsets.all(15),
+        child: Column(
+          children: [
+            Icon(icon, size: 30, color: const Color(0xFF2D7A4F)),
+            const SizedBox(height: 8),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCustomSnackBar({
+    required BuildContext context,
+    required String message,
+    required IconData icon,
+    required bool isError,
+  }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        elevation: 0,
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.transparent,
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isError ? const Color(0xFFE05454) : const Color(0xFF2D7A4F),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _openNotifications() async {
@@ -542,303 +645,303 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(18, 20, 18, 40),
               sliver: SliverList(
-delegate: SliverChildListDelegate(
-  [
-    Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 24,
-        vertical: 20,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          _statItem(
-            '${_totalWeight.toStringAsFixed(1)} kg',
-            'Recycled',
-          ),
-          _divider(),
-          _statItem(
-            _co2Saved.toStringAsFixed(1),
-            'CO2 Saved',
-          ),
-          _divider(),
-          _statItem(
-            _totalPoints.toString(),
-            'Points',
-          ),
-        ],
-      ),
-    ),
-    const SizedBox(height: 28),
-
-    _sectionLabel('Monthly Goal'),
-    const SizedBox(height: 10),
-    GestureDetector(
-      onTap: _showMonthlyGoalSheet,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5EE),
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: const Icon(
-                Icons.flag_rounded,
-                color: Color(0xFF3DAB6A),
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Monthly Recycling Goal',
-                    style: GoogleFonts.dmSans(
-                      color: const Color(0xFF1A4731),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                delegate: SliverChildListDelegate(
+                  [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 20,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          _statItem(
+                            '${_totalWeight.toStringAsFixed(1)} kg',
+                            'Recycled',
+                          ),
+                          _divider(),
+                          _statItem(
+                            _co2Saved.toStringAsFixed(1),
+                            'CO2 Saved',
+                          ),
+                          _divider(),
+                          _statItem(
+                            _totalPoints.toString(),
+                            'Points',
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Tap to update your target',
-                    style: GoogleFonts.dmSans(
-                      color: Colors.grey.shade400,
-                      fontSize: 12,
+                    const SizedBox(height: 28),
+
+                    _sectionLabel('Monthly Goal'),
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: _showMonthlyGoalSheet,
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F5EE),
+                                borderRadius: BorderRadius.circular(13),
+                              ),
+                              child: const Icon(
+                                Icons.flag_rounded,
+                                color: Color(0xFF3DAB6A),
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Monthly Recycling Goal',
+                                    style: GoogleFonts.dmSans(
+                                      color: const Color(0xFF1A4731),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Tap to update your target',
+                                    style: GoogleFonts.dmSans(
+                                      color: Colors.grey.shade400,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE8F5EE),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: const Color(0xFF3DAB6A).withOpacity(0.3),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Text(
+                                '${monthlyGoal % 1 == 0 ? monthlyGoal.toInt() : monthlyGoal.toStringAsFixed(1)} kg',
+                                style: GoogleFonts.dmSans(
+                                  color: const Color(0xFF2D7A4F),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: Colors.grey.shade300,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8F5EE),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: const Color(0xFF3DAB6A).withOpacity(0.3),
-                  width: 1.2,
+
+                    const SizedBox(height: 28),
+                    _sectionLabel('Account'),
+                    const SizedBox(height: 10),
+                    _menuGroup(
+                      [
+                        _MenuItem(
+                          icon: Icons.edit_outlined,
+                          iconColor: const Color(0xFFCC8A2E),
+                          emojiColor: const Color(0xFFFFF3E3),
+                          title: 'Edit Profile',
+                          onTap: _showEditProfileSheet,
+                        ),
+                        _MenuItem(
+                          icon: Icons.lock_outline_rounded,
+                          iconColor: const Color(0xFFE8A020),
+                          emojiColor: const Color(0xFFFBF3E3),
+                          title: 'Change Password',
+                          onTap: _showChangePasswordSheet,
+                        ),
+
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+                    _sectionLabel('Achievements'),
+                    const SizedBox(height: 10),
+                    _menuGroup(
+                      [
+                        _MenuItem(
+                          icon: Icons.star_rounded,
+                          iconColor: const Color(0xFFE8A020),
+                          emojiColor: const Color(0xFFFFF3CD),
+                          title: 'Favourite Stations',
+                          subtitle: 'Your saved recycling spots',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const FavoriteStationsScreen(),
+                            ),
+                          ),
+                        ),
+                        _MenuItem(
+                          icon: Icons.card_giftcard_rounded,
+                          iconColor: const Color(0xFF2D7A4F),
+                          emojiColor: const Color(0xFFE8F5EE),
+                          title: 'Redeem Rewards',
+                          subtitle: 'Use your points now',
+                          onTap: () {
+                            Navigator.push<int>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => RewardsScreen(currentPoints: _totalPoints),
+                              ),
+                            ).then((updatedPoints) {
+                              if (!mounted) return;
+                              if (updatedPoints is int) {
+                                setState(() => _totalPoints = updatedPoints);
+                              }
+                            });
+                          },
+                        ),
+                        _MenuItem(
+                          icon: Icons.history_rounded,
+                          iconColor: const Color(0xFF3DAB6A),
+                          emojiColor: const Color(0xFFE8F5EE),
+                          title: 'Impact History',
+                          subtitle: 'Joined $joined',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ImpactHistoryScreen(),
+                            ),
+                          ),
+                        ),
+                        _MenuItem(
+                          icon: Icons.confirmation_number_rounded,
+                          iconColor: const Color(0xFF2D7A4F),
+                          emojiColor: const Color(0xFFF0F6F2),
+                          title: 'Redeem History',
+                          subtitle: 'Your vouchers and rewards',
+                          isLast: true,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const RedemptionHistoryScreen(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+                    _sectionLabel('App'),
+                    const SizedBox(height: 10),
+                    _menuGroup(
+                      [
+                        _MenuItem(
+                          icon: Icons.info_outline_rounded,
+                          iconColor: const Color(0xFF4A90D9),
+                          emojiColor: const Color(0xFFE8F0FA),
+                          title: 'About GreenTrack',
+                          subtitle: 'Version 1.0.0',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const AboutGreenTrackScreen(),
+                            ),
+                          ),
+                          isLast: true,
+                        ),
+                      ],
+                    ),
+
+                    if (_isAdmin) ...[
+                      const SizedBox(height: 24),
+                      _sectionLabel('Administration'),
+                      const SizedBox(height: 10),
+                      _menuGroup(
+                        [
+                          _MenuItem(
+                            icon: Icons.admin_panel_settings_rounded,
+                            iconColor: const Color(0xFF2D7A4F),
+                            emojiColor: const Color(0xFFE8F5EE),
+                            title: 'Admin Control Center',
+                            subtitle: 'Manage users, records, and stations',
+                            onTap: _openAdminModule,
+                            isLast: true,
+                          ),
+                        ],
+                      ),
+                    ],
+
+                    const SizedBox(height: 28),
+                    GestureDetector(
+                      onTap: _signOut,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF0F0),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFFFFD0D0),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.logout_rounded,
+                              color: Color(0xFFE05454),
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Logout',
+                              style: GoogleFonts.dmSans(
+                                color: const Color(0xFFE05454),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              child: Text(
-                '${monthlyGoal % 1 == 0 ? monthlyGoal.toInt() : monthlyGoal.toStringAsFixed(1)} kg',
-                style: GoogleFonts.dmSans(
-                  color: const Color(0xFF2D7A4F),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: Colors.grey.shade300,
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    ),
-
-    const SizedBox(height: 28),
-    _sectionLabel('Account'),
-    const SizedBox(height: 10),
-    _menuGroup(
-      [
-        _MenuItem(
-          icon: Icons.edit_outlined,
-          iconColor: const Color(0xFFCC8A2E),
-          emojiColor: const Color(0xFFFFF3E3),
-          title: 'Edit Profile',
-          onTap: _showEditProfileSheet,
-        ),
-        _MenuItem(
-          icon: Icons.lock_outline_rounded,
-          iconColor: const Color(0xFFE8A020),
-          emojiColor: const Color(0xFFFBF3E3),
-          title: 'Change Password',
-          onTap: _showChangePasswordSheet,
-        ),
-
-      ],
-    ),
-
-    const SizedBox(height: 24),
-    _sectionLabel('Achievements'),
-    const SizedBox(height: 10),
-    _menuGroup(
-      [
-        _MenuItem(
-          icon: Icons.star_rounded,
-          iconColor: const Color(0xFFE8A020),
-          emojiColor: const Color(0xFFFFF3CD),
-          title: 'Favourite Stations',
-          subtitle: 'Your saved recycling spots',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const FavoriteStationsScreen(),
-            ),
-          ),
-        ),
-        _MenuItem(
-          icon: Icons.card_giftcard_rounded,
-          iconColor: const Color(0xFF2D7A4F),
-          emojiColor: const Color(0xFFE8F5EE),
-          title: 'Redeem Rewards',
-          subtitle: 'Use your points now',
-          onTap: () {
-            Navigator.push<int>(
-              context,
-              MaterialPageRoute(
-                builder: (_) => RewardsScreen(currentPoints: _totalPoints),
-              ),
-            ).then((updatedPoints) {
-              if (!mounted) return;
-              if (updatedPoints is int) {
-                setState(() => _totalPoints = updatedPoints);
-              }
-            });
-          },
-        ),
-        _MenuItem(
-          icon: Icons.history_rounded,
-          iconColor: const Color(0xFF3DAB6A),
-          emojiColor: const Color(0xFFE8F5EE),
-          title: 'Impact History',
-          subtitle: 'Joined $joined',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const ImpactHistoryScreen(),
-            ),
-          ),
-        ),
-        _MenuItem(
-          icon: Icons.confirmation_number_rounded,
-          iconColor: const Color(0xFF2D7A4F),
-          emojiColor: const Color(0xFFF0F6F2),
-          title: 'Redeem History',
-          subtitle: 'Your vouchers and rewards',
-          isLast: true,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const RedemptionHistoryScreen(),
-            ),
-          ),
-        ),
-      ],
-    ),
-
-    const SizedBox(height: 24),
-    _sectionLabel('App'),
-    const SizedBox(height: 10),
-    _menuGroup(
-      [
-        _MenuItem(
-          icon: Icons.info_outline_rounded,
-          iconColor: const Color(0xFF4A90D9),
-          emojiColor: const Color(0xFFE8F0FA),
-          title: 'About GreenTrack',
-          subtitle: 'Version 1.0.0',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const AboutGreenTrackScreen(),
-            ),
-          ),
-          isLast: true,
-        ),
-      ],
-    ),
-
-    if (_isAdmin) ...[
-      const SizedBox(height: 24),
-      _sectionLabel('Administration'),
-      const SizedBox(height: 10),
-      _menuGroup(
-        [
-          _MenuItem(
-            icon: Icons.admin_panel_settings_rounded,
-            iconColor: const Color(0xFF2D7A4F),
-            emojiColor: const Color(0xFFE8F5EE),
-            title: 'Admin Control Center',
-            subtitle: 'Manage users, records, and stations',
-            onTap: _openAdminModule,
-            isLast: true,
-          ),
-        ],
-      ),
-    ],
-
-    const SizedBox(height: 28),
-    GestureDetector(
-      onTap: _signOut,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF0F0),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: const Color(0xFFFFD0D0),
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.logout_rounded,
-              color: Color(0xFFE05454),
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Logout',
-              style: GoogleFonts.dmSans(
-                color: const Color(0xFFE05454),
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  ],
-),
               ),
             ),
           ],
