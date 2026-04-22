@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -24,7 +25,7 @@ class AdminDashboardTab extends StatefulWidget {
   final List<Map<String, dynamic>> stations;
   final Future<void> Function() onRefresh;
   final Future<void> Function(Map<String, dynamic> record, bool approved)
-      onModerateRecord;
+  onModerateRecord;
 
   @override
   State<AdminDashboardTab> createState() => _AdminDashboardTabState();
@@ -35,6 +36,48 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
   static const Color _ink = Color(0xFF1A4731);
 
   _DashboardSection selectedSection = _DashboardSection.recentActivity;
+
+  void _showExpandedImage(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(10),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: InteractiveViewer(
+                child: imageUrl.startsWith('data:image')
+                    ? Image.memory(
+                  base64Decode(imageUrl.split(',').last),
+                  fit: BoxFit.contain,
+                )
+                    : Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.broken_image,
+                    color: Colors.white,
+                    size: 100,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 20,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -206,7 +249,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                   const Spacer(),
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(
                       color: color,
                       borderRadius: BorderRadius.circular(20),
@@ -264,30 +307,66 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
           else
             ...recentActivity.map((record) {
               final submittedBy = (record['submitted_user'] ??
-                      record['user_email'] ??
-                      record['user_id'] ??
-                      '-')
+                  record['user_email'] ??
+                  record['user_id'] ??
+                  '-')
                   .toString();
+              final imageUrl = record['image_url']?.toString();
               return _simpleSectionCard(
                 title:
-                    '${record['category'] ?? '-'} • ${record['weight_kg'] ?? '-'} kg',
-                child: Column(
+                '${record['category'] ?? '-'} • ${record['weight_kg'] ?? '-'} kg',
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Submitted by: $submittedBy',
-                      style: GoogleFonts.dmSans(color: Colors.grey.shade700),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Submitted by: $submittedBy',
+                            style: GoogleFonts.dmSans(color: Colors.grey.shade700),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Status: ${(record['status'] ?? 'pending').toString()}',
+                            style: GoogleFonts.dmSans(color: Colors.grey.shade600),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Date: ${(record['created_at']?.toString() ?? record['date']?.toString() ?? '-').split('T').first}',
+                            style: GoogleFonts.dmSans(color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Status: ${(record['status'] ?? 'pending').toString()}',
-                      style: GoogleFonts.dmSans(color: Colors.grey.shade600),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Date: ${(record['created_at']?.toString() ?? record['date']?.toString() ?? '-').split('T').first}',
-                      style: GoogleFonts.dmSans(color: Colors.grey.shade600),
-                    ),
+                    if (imageUrl != null) ...[
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: () => _showExpandedImage(context, imageUrl),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: imageUrl.startsWith('data:image')
+                              ? Image.memory(
+                            base64Decode(imageUrl.split(',').last),
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.cover,
+                          )
+                              : Image.network(
+                            imageUrl,
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 80,
+                              height: 80,
+                              color: Colors.grey.shade100,
+                              child: const Icon(Icons.broken_image, size: 20),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -314,36 +393,72 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
               final statusColor = status == 'approved'
                   ? const Color(0xFF3DAB6A)
                   : const Color(0xFFE05454);
+              final imageUrl = record['image_url']?.toString();
               return _simpleSectionCard(
                 title: '${record['category']} - ${record['weight_kg']} kg',
-                child: Column(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        _chip(
-                          Icons.storefront_rounded,
-                          (record['station'] ?? '-').toString(),
-                          const Color(0xFFF7F9F8),
-                          _ink,
-                        ),
-                        _chip(
-                          status == 'approved'
-                              ? Icons.check_circle_rounded
-                              : Icons.cancel_rounded,
-                          status.isEmpty ? 'unknown' : status,
-                          statusColor.withValues(alpha: 0.12),
-                          statusColor,
-                        ),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _chip(
+                                Icons.storefront_rounded,
+                                (record['station'] ?? '-').toString(),
+                                const Color(0xFFF7F9F8),
+                                _ink,
+                              ),
+                              _chip(
+                                status == 'approved'
+                                    ? Icons.check_circle_rounded
+                                    : Icons.cancel_rounded,
+                                status.isEmpty ? 'unknown' : status,
+                                statusColor.withValues(alpha: 0.12),
+                                statusColor,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Date: ${(record['date']?.toString() ?? '-').split('T').first}',
+                            style: GoogleFonts.dmSans(color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Date: ${(record['date']?.toString() ?? '-').split('T').first}',
-                      style: GoogleFonts.dmSans(color: Colors.grey.shade600),
-                    ),
+                    if (imageUrl != null) ...[
+                      const SizedBox(width: 12),
+                      GestureDetector(
+                        onTap: () => _showExpandedImage(context, imageUrl),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: imageUrl.startsWith('data:image')
+                              ? Image.memory(
+                            base64Decode(imageUrl.split(',').last),
+                            width: 70,
+                            height: 70,
+                            fit: BoxFit.cover,
+                          )
+                              : Image.network(
+                            imageUrl,
+                            width: 70,
+                            height: 70,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 70,
+                              height: 70,
+                              color: Colors.grey.shade100,
+                              child: const Icon(Icons.broken_image, size: 20),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -366,19 +481,60 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
             )
           else
             ...pendingSubmissions.map((record) {
+              final imageUrl = record['image_url']?.toString();
               return _simpleSectionCard(
                 title: '${record['category']} - ${record['weight_kg']} kg',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Station: ${record['station'] ?? '-'}',
-                      style: GoogleFonts.dmSans(color: Colors.grey.shade700),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Date: ${(record['date']?.toString() ?? '-').split('T').first}',
-                      style: GoogleFonts.dmSans(color: Colors.grey.shade600),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Station: ${record['station'] ?? '-'}',
+                                style: GoogleFonts.dmSans(color: Colors.grey.shade700),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Date: ${(record['date']?.toString() ?? '-').split('T').first}',
+                                style: GoogleFonts.dmSans(color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (imageUrl != null) ...[
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: () => _showExpandedImage(context, imageUrl),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: imageUrl.startsWith('data:image')
+                                  ? Image.memory(
+                                base64Decode(imageUrl.split(',').last),
+                                width: 90,
+                                height: 90,
+                                fit: BoxFit.cover,
+                              )
+                                  : Image.network(
+                                imageUrl,
+                                width: 90,
+                                height: 90,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  width: 90,
+                                  height: 90,
+                                  color: Colors.grey.shade100,
+                                  child: const Icon(Icons.broken_image, size: 24),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -515,11 +671,11 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
   }
 
   Widget _chip(
-    IconData icon,
-    String text,
-    Color bg,
-    Color fg,
-  ) {
+      IconData icon,
+      String text,
+      Color bg,
+      Color fg,
+      ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(

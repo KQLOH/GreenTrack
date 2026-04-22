@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/supabase_client.dart';
@@ -101,6 +102,48 @@ class _ImpactHistoryScreenState extends State<ImpactHistoryScreen> {
         '${dt.year}  '
         '${dt.hour.toString().padLeft(2, '0')}:'
         '${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  void _showExpandedImage(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(10),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: InteractiveViewer(
+                child: imageUrl.startsWith('data:image')
+                    ? Image.memory(
+                  base64Decode(imageUrl.split(',').last),
+                  fit: BoxFit.contain,
+                )
+                    : Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.broken_image,
+                    color: Colors.white,
+                    size: 100,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 20,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -319,6 +362,7 @@ class _ImpactHistoryScreenState extends State<ImpactHistoryScreen> {
                     final createdAt = _formatDate(
                       (r['created_at'] ?? '').toString(),
                     );
+                    final imageUrl = r['image_url']?.toString();
 
                     final style = _categoryStyle(category);
                     final icon = style['icon'] as IconData;
@@ -352,7 +396,7 @@ class _ImpactHistoryScreenState extends State<ImpactHistoryScreen> {
                             if (!isLast)
                               Container(
                                 width: 2,
-                                height: 110,
+                                height: imageUrl != null ? 220 : 110,
                                 color: const Color(0xFFDDEADF),
                               ),
                           ],
@@ -373,169 +417,202 @@ class _ImpactHistoryScreenState extends State<ImpactHistoryScreen> {
                                 ),
                               ],
                             ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Column(
                               children: [
-                                Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: bg,
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                  child: Icon(icon, color: color, size: 24),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: bg,
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                      child: Icon(icon, color: color, size: 24),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                         children: [
-                                          Expanded(
-                                            child: Text(
-                                              category,
-                                              style: GoogleFonts.dmSans(
-                                                color: const Color(0xFF1A4731),
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 5,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFE8F5EE),
-                                              borderRadius:
-                                              BorderRadius.circular(10),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(
-                                                  Icons.check_circle_rounded,
-                                                  color: Color(0xFF3DAB6A),
-                                                  size: 12,
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  'Approved',
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  category,
                                                   style: GoogleFonts.dmSans(
-                                                    color:
-                                                    const Color(0xFF3DAB6A),
-                                                    fontSize: 11,
-                                                    fontWeight:
-                                                    FontWeight.w700,
+                                                    color: const Color(0xFF1A4731),
+                                                    fontSize: 15,
+                                                    fontWeight: FontWeight.w700,
                                                   ),
                                                 ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.location_on_outlined,
-                                            size: 14,
-                                            color: Colors.grey.shade400,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Expanded(
-                                            child: Text(
-                                              station,
-                                              style: GoogleFonts.dmSans(
-                                                color: Colors.grey.shade600,
-                                                fontSize: 12,
                                               ),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.schedule_rounded,
-                                            size: 14,
-                                            color: Colors.grey.shade400,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            createdAt,
-                                            style: GoogleFonts.dmSans(
-                                              color: Colors.grey.shade500,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: bg,
-                                              borderRadius:
-                                              BorderRadius.circular(10),
-                                            ),
-                                            child: Text(
-                                              '${weight.toStringAsFixed(1)} kg',
-                                              style: GoogleFonts.dmSans(
-                                                color: color,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 10,
-                                              vertical: 6,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFFFF4DD),
-                                              borderRadius:
-                                              BorderRadius.circular(10),
-                                            ),
-                                            child: Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(
-                                                  Icons.star_rounded,
-                                                  color: Color(0xFFE8A020),
-                                                  size: 13,
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 5,
                                                 ),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  '+$points pts',
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFE8F5EE),
+                                                  borderRadius:
+                                                  BorderRadius.circular(10),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.check_circle_rounded,
+                                                      color: Color(0xFF3DAB6A),
+                                                      size: 12,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      'Approved',
+                                                      style: GoogleFonts.dmSans(
+                                                        color:
+                                                        const Color(0xFF3DAB6A),
+                                                        fontSize: 11,
+                                                        fontWeight:
+                                                        FontWeight.w700,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.location_on_outlined,
+                                                size: 14,
+                                                color: Colors.grey.shade400,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Expanded(
+                                                child: Text(
+                                                  station,
                                                   style: GoogleFonts.dmSans(
-                                                    color:
-                                                    const Color(0xFFE8A020),
+                                                    color: Colors.grey.shade600,
                                                     fontSize: 12,
-                                                    fontWeight:
-                                                    FontWeight.w700,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.schedule_rounded,
+                                                size: 14,
+                                                color: Colors.grey.shade400,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                createdAt,
+                                                style: GoogleFonts.dmSans(
+                                                  color: Colors.grey.shade500,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 6,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: bg,
+                                                  borderRadius:
+                                                  BorderRadius.circular(10),
+                                                ),
+                                                child: Text(
+                                                  '${weight.toStringAsFixed(1)} kg',
+                                                  style: GoogleFonts.dmSans(
+                                                    color: color,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w700,
                                                   ),
                                                 ),
-                                              ],
-                                            ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 10,
+                                                  vertical: 6,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFFF4DD),
+                                                  borderRadius:
+                                                  BorderRadius.circular(10),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.star_rounded,
+                                                      color: Color(0xFFE8A020),
+                                                      size: 13,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      '+$points pts',
+                                                      style: GoogleFonts.dmSans(
+                                                        color:
+                                                        const Color(0xFFE8A020),
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                        FontWeight.w700,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
                                           ),
                                         ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
+                                if (imageUrl != null) ...[
+                                  const SizedBox(height: 12),
+                                  GestureDetector(
+                                    onTap: () => _showExpandedImage(context, imageUrl),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: imageUrl.startsWith('data:image')
+                                          ? Image.memory(
+                                        base64Decode(imageUrl.split(',').last),
+                                        height: 120,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                      )
+                                          : Image.network(
+                                        imageUrl,
+                                        height: 120,
+                                        width: double.infinity,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          height: 120,
+                                          width: double.infinity,
+                                          color: Colors.grey.shade100,
+                                          child: Icon(Icons.broken_image_outlined,
+                                              color: Colors.grey.shade300),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
