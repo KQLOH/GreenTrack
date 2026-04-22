@@ -18,7 +18,7 @@ import 'impact_history_screen.dart';
 import 'about_greentrack_screen.dart';
 import 'redemption_history_screen.dart';
 import 'rewards_screen.dart';
-
+import 'green_journal_screen.dart';
 final _supabase = supabaseClient;
 final _authService = AuthService();
 
@@ -42,6 +42,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  void _openGreenJournal() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const GreenJournalScreen()),
+    );
   }
 
   Future<void> _loadData() async {
@@ -801,6 +808,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 10),
                     _menuGroup(
                       [
+                        _MenuItem(
+                          icon: Icons.menu_book_rounded,
+                          iconColor: const Color(0xFF2D7A4F),
+                          emojiColor: const Color(0xFFE8F5EE),
+                          title: 'Green Journal',
+                          subtitle: 'Track your eco-friendly habits offline',
+                          onTap: _openGreenJournal,
+                        ),
                         _MenuItem(
                           icon: Icons.star_rounded,
                           iconColor: const Color(0xFFE8A020),

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -82,6 +83,48 @@ class _AdminRecordsTabState extends State<AdminRecordsTab> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _showExpandedImage(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(10),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: InteractiveViewer(
+                child: imageUrl.startsWith('data:image')
+                    ? Image.memory(
+                  base64Decode(imageUrl.split(',').last),
+                  fit: BoxFit.contain,
+                )
+                    : Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.broken_image,
+                    color: Colors.white,
+                    size: 100,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 20,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -182,6 +225,7 @@ class _AdminRecordsTabState extends State<AdminRecordsTab> {
                   .toString()
                   .split('T')
                   .first;
+              final imageUrl = record['image_url']?.toString();
 
               return _simpleSectionCard(
                 title:
@@ -189,42 +233,82 @@ class _AdminRecordsTabState extends State<AdminRecordsTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _chip(
-                          Icons.person_outline_rounded,
-                          submittedBy,
-                          const Color(0xFFF7F9F8),
-                          _ink,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  _chip(
+                                    Icons.person_outline_rounded,
+                                    submittedBy,
+                                    const Color(0xFFF7F9F8),
+                                    _ink,
+                                  ),
+                                  _chip(
+                                    Icons.storefront_rounded,
+                                    (record['station'] ?? '-').toString(),
+                                    const Color(0xFFE8F1FB),
+                                    const Color(0xFF4A90D9),
+                                  ),
+                                  _chip(
+                                    Icons.info_outline_rounded,
+                                    status,
+                                    status.toLowerCase() == 'approved'
+                                        ? const Color(0xFFE8F5EE)
+                                        : status.toLowerCase() == 'rejected'
+                                        ? const Color(0xFFFFF0F0)
+                                        : const Color(0xFFFFF8E9),
+                                    status.toLowerCase() == 'approved'
+                                        ? const Color(0xFF3DAB6A)
+                                        : status.toLowerCase() == 'rejected'
+                                        ? const Color(0xFFE05454)
+                                        : const Color(0xFFE39B35),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Date: $createdAt',
+                                style: GoogleFonts.dmSans(color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
                         ),
-                        _chip(
-                          Icons.storefront_rounded,
-                          (record['station'] ?? '-').toString(),
-                          const Color(0xFFE8F1FB),
-                          const Color(0xFF4A90D9),
-                        ),
-                        _chip(
-                          Icons.info_outline_rounded,
-                          status,
-                          status.toLowerCase() == 'approved'
-                              ? const Color(0xFFE8F5EE)
-                              : status.toLowerCase() == 'rejected'
-                              ? const Color(0xFFFFF0F0)
-                              : const Color(0xFFFFF8E9),
-                          status.toLowerCase() == 'approved'
-                              ? const Color(0xFF3DAB6A)
-                              : status.toLowerCase() == 'rejected'
-                              ? const Color(0xFFE05454)
-                              : const Color(0xFFE39B35),
-                        ),
+                        if (imageUrl != null) ...[
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: () => _showExpandedImage(context, imageUrl),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: imageUrl.startsWith('data:image')
+                                  ? Image.memory(
+                                base64Decode(imageUrl.split(',').last),
+                                width: 70,
+                                height: 70,
+                                fit: BoxFit.cover,
+                              )
+                                  : Image.network(
+                                imageUrl,
+                                width: 70,
+                                height: 70,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  width: 70,
+                                  height: 70,
+                                  color: Colors.grey.shade100,
+                                  child: const Icon(Icons.broken_image, size: 20),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Date: $createdAt',
-                      style: GoogleFonts.dmSans(color: Colors.grey.shade600),
                     ),
                     const SizedBox(height: 12),
                     Row(

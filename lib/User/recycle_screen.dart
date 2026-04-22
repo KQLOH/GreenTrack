@@ -1,6 +1,11 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
 import '../services/supabase_client.dart';
 
 final supabase = supabaseClient;
@@ -19,6 +24,7 @@ class RecycleRecord {
   final double? locationLng;
   final DateTime? approvedAt;
   final String? rejectionReason;
+  final String? imageUrl;
 
   RecycleRecord({
     required this.id,
@@ -34,6 +40,7 @@ class RecycleRecord {
     this.locationLng,
     this.approvedAt,
     this.rejectionReason,
+    this.imageUrl,
   });
 
   factory RecycleRecord.fromMap(Map<String, dynamic> map) {
@@ -53,6 +60,7 @@ class RecycleRecord {
           ? DateTime.parse(map['approved_at'].toString())
           : null,
       rejectionReason: map['rejection_reason']?.toString(),
+      imageUrl: map['image_url']?.toString(),
     );
   }
 }
@@ -122,7 +130,7 @@ class _RecycleScreenState extends State<RecycleScreen>
   }
   List<String> _stations = <String>[];
   Map<String, Map<String, double>> _stationCoordinates =
-      <String, Map<String, double>>{};
+  <String, Map<String, double>>{};
   bool _isLoading = true;
   int _currentPoints = 0;
 
@@ -284,7 +292,7 @@ class _RecycleScreenState extends State<RecycleScreen>
           style: GoogleFonts.dmSans(color: Colors.white),
         ),
         backgroundColor:
-            isError ? const Color(0xFFE05454) : const Color(0xFF3DAB6A),
+        isError ? const Color(0xFFE05454) : const Color(0xFF3DAB6A),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -320,17 +328,17 @@ class _RecycleScreenState extends State<RecycleScreen>
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF3DAB6A),
-                    ),
-                  )
+              child: CircularProgressIndicator(
+                color: Color(0xFF3DAB6A),
+              ),
+            )
                 : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildAddTab(),
-                      _buildHistoryTab(),
-                    ],
-                  ),
+              controller: _tabController,
+              children: [
+                _buildAddTab(),
+                _buildHistoryTab(),
+              ],
+            ),
           ),
         ],
       ),
@@ -379,7 +387,7 @@ class _RecycleScreenState extends State<RecycleScreen>
                   const Spacer(),
                   Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
@@ -441,7 +449,7 @@ class _RecycleScreenState extends State<RecycleScreen>
         labelColor: const Color(0xFF7EEDB0),
         unselectedLabelColor: Colors.white.withValues(alpha: 0.5),
         labelStyle:
-            GoogleFonts.dmSans(fontSize: 13, fontWeight: FontWeight.w600),
+        GoogleFonts.dmSans(fontSize: 13, fontWeight: FontWeight.w600),
         unselectedLabelStyle: GoogleFonts.dmSans(fontSize: 13),
         tabs: const [
           Tab(text: 'ADD / SUBMIT'),
@@ -511,7 +519,7 @@ class _RecycleScreenState extends State<RecycleScreen>
           ),
           const SizedBox(height: 12),
           ..._records.map(
-            (r) => _RecordCard(
+                (r) => _RecordCard(
               record: r,
               canManage: r.status.toLowerCase() == 'pending',
               onEdit: () => _openAddSheet(editing: r),
@@ -675,6 +683,8 @@ class _InlineAddForm extends StatefulWidget {
 
 class _InlineAddFormState extends State<_InlineAddForm> {
   final _weightController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+  XFile? _imageFile;
 
   String _selectedCategory = 'Plastic';
   String _selectedStation = '';
@@ -690,7 +700,7 @@ class _InlineAddFormState extends State<_InlineAddForm> {
   String _locationStatus = 'Checking location...';
 
   int get _calculatedPoints => ((double.tryParse(_weightController.text) ?? 0) *
-          (categories[_selectedCategory]?.pointsPerKg ?? 10))
+      (categories[_selectedCategory]?.pointsPerKg ?? 10))
       .round();
 
   @override
@@ -728,6 +738,18 @@ class _InlineAddFormState extends State<_InlineAddForm> {
   void dispose() {
     _weightController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 70,
+    );
+    if (image != null) {
+      setState(() {
+        _imageFile = image;
+      });
+    }
   }
 
   Future<void> _checkLocation() async {
@@ -872,6 +894,11 @@ class _InlineAddFormState extends State<_InlineAddForm> {
       return;
     }
 
+    if (_imageFile == null) {
+      _showSnack('Please take a photo of your recycling items', isError: true);
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -879,6 +906,13 @@ class _InlineAddFormState extends State<_InlineAddForm> {
       if (user == null) {
         _showSnack('User not logged in', isError: true);
         return;
+      }
+
+      String? imageUrl;
+      if (_imageFile != null) {
+        final bytes = await _imageFile!.readAsBytes();
+        final String base64String = base64Encode(bytes);
+        imageUrl = 'data:image/jpeg;base64,$base64String';
       }
 
       await supabase.from('recycle_records').insert({
@@ -891,14 +925,16 @@ class _InlineAddFormState extends State<_InlineAddForm> {
         'location_lat': _currentLat,
         'location_lng': _currentLng,
         'date': _selectedDate.toIso8601String().substring(0, 10),
+        'image_url': imageUrl,
       });
 
       _weightController.clear();
       setState(() {
         _selectedCategory = 'Plastic';
         _selectedStation =
-            widget.stations.isNotEmpty ? widget.stations.first : '';
+        widget.stations.isNotEmpty ? widget.stations.first : '';
         _selectedDate = DateTime.now();
+        _imageFile = null;
       });
 
       await widget.onSuccess();
@@ -910,9 +946,10 @@ class _InlineAddFormState extends State<_InlineAddForm> {
         );
         _checkLocation();
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Submission error: $e');
       if (mounted) {
-        _showSnack('Submission failed. Please try again.', isError: true);
+        _showSnack('Submission failed: ${e.toString()}', isError: true);
       }
     } finally {
       if (mounted) {
@@ -929,7 +966,7 @@ class _InlineAddFormState extends State<_InlineAddForm> {
           style: GoogleFonts.dmSans(color: Colors.white),
         ),
         backgroundColor:
-            isError ? const Color(0xFFE05454) : const Color(0xFF3DAB6A),
+        isError ? const Color(0xFFE05454) : const Color(0xFF3DAB6A),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
@@ -1002,7 +1039,7 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     color: selected ? cfg.color : cfg.bgColor,
                     borderRadius: BorderRadius.circular(12),
@@ -1033,6 +1070,74 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                 ),
               );
             }).toList(),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'PHOTO EVIDENCE',
+            style: GoogleFonts.dmSans(
+              color: const Color(0xFF888888),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+            ),
+          ),
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _pickImage,
+            child: Container(
+              height: 120,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F9F8),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200, width: 1.5),
+              ),
+              child: _imageFile != null
+                  ? Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(11),
+                    child: Image.file(
+                      File(_imageFile!.path),
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: GestureDetector(
+                      onTap: () => setState(() => _imageFile = null),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close,
+                            color: Colors.white, size: 16),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+                  : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.camera_alt_outlined,
+                      color: Colors.grey.shade400, size: 30),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Take a photo of items',
+                    style: GoogleFonts.dmSans(
+                      color: Colors.grey.shade500,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           Text(
@@ -1070,13 +1175,13 @@ class _InlineAddFormState extends State<_InlineAddForm> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    const BorderSide(color: Color(0xFF3DAB6A), width: 1.5),
+                const BorderSide(color: Color(0xFF3DAB6A), width: 1.5),
               ),
               contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               suffixText: 'kg',
               suffixStyle:
-                  GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 14),
+              GoogleFonts.dmSans(color: Colors.grey.shade400, fontSize: 14),
             ),
           ),
           const SizedBox(height: 20),
@@ -1114,36 +1219,36 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                 ),
                 selectedItemBuilder: (context) =>
                     _stationsSortedByDistance.map((s) {
-                  final dist = _distanceTo(s);
-                  return Align(
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            s,
-                            style: GoogleFonts.dmSans(
-                              color: const Color(0xFF1A4731),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
+                      final dist = _distanceTo(s);
+                      return Align(
+                        alignment: Alignment.centerLeft,
+                        child: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                s,
+                                style: GoogleFonts.dmSans(
+                                  color: const Color(0xFF1A4731),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                            if (dist != null) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                _formatDistance(dist),
+                                style: GoogleFonts.dmSans(
+                                  color: Colors.grey.shade400,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                        if (dist != null) ...[
-                          const SizedBox(width: 6),
-                          Text(
-                            _formatDistance(dist),
-                            style: GoogleFonts.dmSans(
-                              color: Colors.grey.shade400,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
                 items: _stationsSortedByDistance.map((s) {
                   final dist = _distanceTo(s);
                   final isNearest = _stationsSortedByDistance.isNotEmpty &&
@@ -1212,14 +1317,14 @@ class _InlineAddFormState extends State<_InlineAddForm> {
                 onChanged: widget.stations.isEmpty
                     ? null
                     : (v) {
-                        if (v == null) return;
-                        setState(() => _selectedStation = v);
-                        if (_currentLat != null && _currentLng != null) {
-                          _validateAgainstSelectedStation();
-                        } else {
-                          _checkLocation();
-                        }
-                      },
+                  if (v == null) return;
+                  setState(() => _selectedStation = v);
+                  if (_currentLat != null && _currentLng != null) {
+                    _validateAgainstSelectedStation();
+                  } else {
+                    _checkLocation();
+                  }
+                },
               ),
             ),
           ),
@@ -1395,13 +1500,13 @@ class _InlineAddFormState extends State<_InlineAddForm> {
             height: 52,
             child: ElevatedButton(
               onPressed:
-                  (_isLoading || _isCheckingLocation || !_isLocationValid)
-                      ? null
-                      : _submit,
+              (_isLoading || _isCheckingLocation || !_isLocationValid)
+                  ? null
+                  : _submit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF2D7A4F),
                 disabledBackgroundColor:
-                    const Color(0xFF2D7A4F).withValues(alpha: 0.5),
+                const Color(0xFF2D7A4F).withValues(alpha: 0.5),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -1409,21 +1514,21 @@ class _InlineAddFormState extends State<_InlineAddForm> {
               ),
               child: _isLoading
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
-                      ),
-                    )
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
                   : Text(
-                      _isLocationValid ? 'Submit Record' : 'Not near a station',
-                      style: GoogleFonts.dmSans(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                _isLocationValid ? 'Submit Record' : 'Not near a station',
+                style: GoogleFonts.dmSans(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -1471,6 +1576,48 @@ class _RecordCard extends StatelessWidget {
     }
   }
 
+  void _showExpandedImage(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(10),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: InteractiveViewer(
+                child: imageUrl.startsWith('data:image')
+                    ? Image.memory(
+                  base64Decode(imageUrl.split(',').last),
+                  fit: BoxFit.contain,
+                )
+                    : Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.broken_image,
+                    color: Colors.white,
+                    size: 100,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 20,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cfg = categories[record.category] ?? categories['Plastic']!;
@@ -1492,158 +1639,191 @@ class _RecordCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: cfg.bgColor,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(cfg.icon, color: cfg.color, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: cfg.bgColor,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(cfg.icon, color: cfg.color, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      children: [
+                        Text(
+                          record.category,
+                          style: GoogleFonts.dmSans(
+                            color: const Color(0xFF1A4731),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusInfo['bgColor'] as Color,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                statusInfo['icon'] as IconData,
+                                color: statusInfo['color'] as Color,
+                                size: 11,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                statusInfo['label'] as String,
+                                style: GoogleFonts.dmSans(
+                                  color: statusInfo['color'] as Color,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
                     Text(
-                      record.category,
+                      '$dateStr  ·  ${record.station}',
                       style: GoogleFonts.dmSans(
-                        color: const Color(0xFF1A4731),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade500,
+                        fontSize: 11,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (record.rejectionReason != null &&
+                        record.rejectionReason!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Reason: ${record.rejectionReason}',
+                        style: GoogleFonts.dmSans(
+                          color: const Color(0xFFE05454),
+                          fontSize: 11,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${record.weightKg.toStringAsFixed(1)} kg',
+                    style: GoogleFonts.dmSans(
+                      color: cfg.color,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Color(0xFFFFB800),
+                        size: 12,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${record.points} pts',
+                        style: GoogleFonts.dmSans(
+                          color: Colors.grey.shade400,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              if (canManage) ...[
+                const SizedBox(width: 10),
+                Column(
+                  children: [
+                    GestureDetector(
+                      onTap: onEdit,
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FAF4),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.edit_outlined,
+                          color: Color(0xFF3DAB6A),
+                          size: 15,
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusInfo['bgColor'] as Color,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            statusInfo['icon'] as IconData,
-                            color: statusInfo['color'] as Color,
-                            size: 11,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            statusInfo['label'] as String,
-                            style: GoogleFonts.dmSans(
-                              color: statusInfo['color'] as Color,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: onDelete,
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF0F0),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.delete_outline,
+                          color: Color(0xFFE05454),
+                          size: 15,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '$dateStr  ·  ${record.station}',
-                  style: GoogleFonts.dmSans(
-                    color: Colors.grey.shade500,
-                    fontSize: 11,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (record.rejectionReason != null &&
-                    record.rejectionReason!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Reason: ${record.rejectionReason}',
-                    style: GoogleFonts.dmSans(
-                      color: const Color(0xFFE05454),
-                      fontSize: 11,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
               ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${record.weightKg.toStringAsFixed(1)} kg',
-                style: GoogleFonts.dmSans(
-                  color: cfg.color,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.star_rounded,
-                    color: Color(0xFFFFB800),
-                    size: 12,
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${record.points} pts',
-                    style: GoogleFonts.dmSans(
-                      color: Colors.grey.shade400,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
-          if (canManage) ...[
-            const SizedBox(width: 10),
-            Column(
-              children: [
-                GestureDetector(
-                  onTap: onEdit,
-                  child: Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FAF4),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.edit_outlined,
-                      color: Color(0xFF3DAB6A),
-                      size: 15,
-                    ),
+          if (record.imageUrl != null) ...[
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: () => _showExpandedImage(context, record.imageUrl!),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: record.imageUrl!.startsWith('data:image')
+                    ? Image.memory(
+                  base64Decode(record.imageUrl!.split(',').last),
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                )
+                    : Image.network(
+                  record.imageUrl!,
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    height: 150,
+                    width: double.infinity,
+                    color: Colors.grey.shade100,
+                    child: Icon(Icons.broken_image_outlined,
+                        color: Colors.grey.shade300),
                   ),
                 ),
-                const SizedBox(height: 6),
-                GestureDetector(
-                  onTap: onDelete,
-                  child: Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF0F0),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.delete_outline,
-                      color: Color(0xFFE05454),
-                      size: 15,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
         ],
@@ -1707,15 +1887,15 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
         await supabase
             .from('recycle_records')
             .update({
-              'category': _selectedCategory,
-              'weight_kg': weight,
-              'station': _selectedStation,
-              'points': 0,
-              'status': 'pending',
-              'approved_at': null,
-              'rejection_reason': null,
-              'date': _selectedDate.toIso8601String().substring(0, 10),
-            })
+          'category': _selectedCategory,
+          'weight_kg': weight,
+          'station': _selectedStation,
+          'points': 0,
+          'status': 'pending',
+          'approved_at': null,
+          'rejection_reason': null,
+          'date': _selectedDate.toIso8601String().substring(0, 10),
+        })
             .eq('id', widget.editing!.id)
             .eq('user_id', user.id);
 
@@ -1776,7 +1956,7 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
                 onTap: () => setState(() => _selectedCategory = cat),
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: selected ? cfg.color : cfg.bgColor,
                     borderRadius: BorderRadius.circular(10),
@@ -1821,7 +2001,7 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    const BorderSide(color: Color(0xFF3DAB6A), width: 1.5),
+                const BorderSide(color: Color(0xFF3DAB6A), width: 1.5),
               ),
             ),
           ),
@@ -1857,10 +2037,10 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
                 onChanged: widget.stations.isEmpty
                     ? null
                     : (v) {
-                        if (v != null) {
-                          setState(() => _selectedStation = v);
-                        }
-                      },
+                  if (v != null) {
+                    setState(() => _selectedStation = v);
+                  }
+                },
               ),
             ),
           ),
@@ -1879,20 +2059,20 @@ class _AddRecordSheetState extends State<_AddRecordSheet> {
               ),
               child: _isLoading
                   ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
-                      ),
-                    )
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
                   : Text(
-                      'Save Changes',
-                      style: GoogleFonts.dmSans(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                'Save Changes',
+                style: GoogleFonts.dmSans(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
