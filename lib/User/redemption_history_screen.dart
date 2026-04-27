@@ -31,7 +31,7 @@ class _RedemptionHistoryScreenState extends State<RedemptionHistoryScreen> with 
 
       final data = await db
           .from('reward_redemptions')
-          .select('*, admin_rewards(name, provider, face_value_rm)')
+          .select('*, admin_rewards(name)')
           .eq('user_id', user.id)
           .order('created_at', ascending: false);
 
@@ -250,12 +250,11 @@ class _RedemptionHistoryScreenState extends State<RedemptionHistoryScreen> with 
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(reward['name'] ?? 'Reward', style: GoogleFonts.dmSans(fontWeight: FontWeight.bold, fontSize: 15)),
-                        Text('Redeemed on ${DateFormat('dd MMM yyyy').format(createdAt)}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        Text(reward['name'] ?? 'Reward', style: GoogleFonts.dmSans(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 15)),
+                        Text('Redeemed on ${DateFormat('dd MMM yyyy').format(createdAt)}', style: const TextStyle(color: Colors.black, fontSize: 12)),
                       ],
                     ),
                   ),
-                  Text('RM ${reward['face_value_rm']}', style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D7A4F), fontSize: 16)),
                 ],
               ),
               const Divider(height: 24, thickness: 0.5),

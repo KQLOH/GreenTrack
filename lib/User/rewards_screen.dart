@@ -95,22 +95,24 @@ class _RewardsScreenState extends State<RewardsScreen> {
     );
 
     try {
-      final newPoints = _displayPoints - ptsRequired;
-
-      await _supabase.from('profiles').update({'total_points': newPoints}).eq('id', user.id).select().single();
-
-      await _supabase.from('admin_rewards').update({
-        'available_quantity': (reward['available_quantity'] as int) - 1,
-        'redeemed_count': ((reward['redeemed_count'] as num?)?.toInt() ?? 0) + 1,
-      }).eq('id', rewardId).select().single();
-
+      // 1. Try to create the redemption record first.
+      // We exclude 'status' to let DB use default 'pending', but include 'provider'.
       await _supabase.from('reward_redemptions').insert({
         'user_id': user.id,
         'reward_id': rewardId,
         'points_spent': ptsRequired,
-        'status': 'pending',
         'quantity': 1,
+        'provider': reward['provider']?.toString() ?? 'generic',
       });
+
+      // 2. Deduction only occurs if the insert above succeeded.
+      final newPoints = _displayPoints - ptsRequired;
+      await _supabase.from('profiles').update({'total_points': newPoints}).eq('id', user.id);
+
+      await _supabase.from('admin_rewards').update({
+        'available_quantity': (reward['available_quantity'] as int) - 1,
+        'redeemed_count': ((reward['redeemed_count'] as num?)?.toInt() ?? 0) + 1,
+      }).eq('id', rewardId);
 
       if (mounted) {
         Navigator.pop(context);
@@ -198,8 +200,7 @@ class _RewardsScreenState extends State<RewardsScreen> {
             _buildRewardIcon(reward['provider']?.toString()),
             const SizedBox(width: 16),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(reward['name'] ?? 'Unnamed', style: GoogleFonts.dmSans(fontWeight: FontWeight.bold, fontSize: 15)),
-              Text('RM ${reward['face_value_rm']} · ${reward['description']}', style: GoogleFonts.dmSans(color: Colors.grey, fontSize: 12)),
+              Text(reward['name'] ?? 'Unnamed', style: GoogleFonts.dmSans(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 15)),
               if (maxPerUser > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),

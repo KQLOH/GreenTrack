@@ -484,7 +484,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         Row(
                           children: [
-                            const SizedBox(width: 38, height: 38),
+                            GestureDetector(
+                              onTap: _openNotifications,
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    width: 38,
+                                    height: 38,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.15),
+                                      borderRadius:
+                                      BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.white.withValues(alpha: 0.2),
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.notifications_none_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                  if (_unreadCount > 0)
+                                    Positioned(
+                                      right: 2,
+                                      top: 2,
+                                      child: Container(
+                                        width: 10,
+                                        height: 10,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFE05454),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
                             const Spacer(),
                             Text(
                               'Profile',
@@ -786,6 +822,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _menuGroup(
                       [
                         _MenuItem(
+                          icon: Icons.notifications_none_rounded,
+                          iconColor: const Color(0xFF4A90D9),
+                          emojiColor: const Color(0xFFE8F0FA),
+                          title: 'Notifications',
+                          badge: _unreadCount > 0 ? _unreadCount : null,
+                          onTap: _openNotifications,
+                        ),
+                        _MenuItem(
                           icon: Icons.edit_outlined,
                           iconColor: const Color(0xFFCC8A2E),
                           emojiColor: const Color(0xFFFFF3E3),
@@ -798,8 +842,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           emojiColor: const Color(0xFFFBF3E3),
                           title: 'Change Password',
                           onTap: _showChangePasswordSheet,
+                          isLast: true,
                         ),
-
                       ],
                     ),
 

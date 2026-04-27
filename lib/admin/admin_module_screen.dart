@@ -905,12 +905,46 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       setState(() => _isSavingRecord = true);
     }
     try {
+      final newStatus = statusController.text.trim().toLowerCase();
+      final oldStatus = (record['status'] ?? '').toString().toLowerCase();
+      final newCategory = typeController.text.trim();
+      final updatedPoints = _calcPoints({
+        'weight_kg': weight,
+        'category': newCategory,
+      });
+
       await _supabase.from('recycle_records').update({
-        'category': typeController.text.trim(),
+        'category': newCategory,
         'weight_kg': weight,
         'station': stationController.text.trim(),
-        'status': statusController.text.trim().toLowerCase(),
+        'status': newStatus,
+        if (newStatus == 'approved' && oldStatus != 'approved')
+          'approved_at': DateTime.now().toIso8601String(),
+        if (newStatus == 'approved') 'points': updatedPoints,
       }).eq('id', recordId);
+
+      // Send notification if status changed to approved or rejected
+      if (newStatus != oldStatus &&
+          (newStatus == 'approved' || newStatus == 'rejected')) {
+        final userId = record['user_id']?.toString();
+        if (userId != null) {
+          try {
+            await _supabase.from('notifications').insert({
+              'user_id': userId,
+              'type': newStatus,
+              'title': newStatus == 'approved'
+                  ? 'Record Approved ✅'
+                  : 'Record Rejected ❌',
+              'body': newStatus == 'approved'
+                  ? 'Your ${weight.toStringAsFixed(1)}kg $newCategory recycling record has been approved! You earned $updatedPoints points.'
+                  : 'Your ${weight.toStringAsFixed(1)}kg $newCategory recycling record was not approved. Please contact staff for details.',
+              'is_read': false,
+            });
+          } catch (e) {
+            debugPrint('Error sending notification from edit sheet: $e');
+          }
+        }
+      }
 
       await Future.wait([
         _loadRecords(),
@@ -1162,8 +1196,6 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
 
         payload['code'] =
         '${slug.isEmpty ? 'reward' : slug}-${DateTime.now().millisecondsSinceEpoch}';
-        payload['provider'] = '';
-        payload['face_value_rm'] = 0;
         payload['max_per_user'] = 1;
         payload['redeemed_count'] = 0;
 
@@ -1251,8 +1283,8 @@ class _AdminModuleScreenState extends State<AdminModuleScreen>
       _showSnack('Reward deleted.', isError: false);
     } on PostgrestException catch (error) {
       final detail =
-          '${error.message} ${error.details ?? ''} ${error.hint ?? ''}'
-              .toLowerCase();
+      '${error.message} ${error.details ?? ''} ${error.hint ?? ''}'
+          .toLowerCase();
       final isReferencedByRedemptions =
           error.code == '23503' ||
               detail.contains('foreign key') ||
